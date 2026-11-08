@@ -1,0 +1,934 @@
+/* ==========================================================
+   Portal Celao em Foco — estilos (MOBILE-FIRST)
+
+   Como este arquivo funciona:
+   - Os estilos "soltos" valem para o CELULAR (tela pequena).
+   - Os blocos @media (min-width: ...) no fim de cada parte só
+     ACRESCENTAM melhorias para telas maiores:
+         640px  = celular grande / tablet pequeno
+         960px  = tablet / notebook
+         1280px = desktop
+   - O layout (tópicos lado a lado com rolagem lateral, lista de cartões,
+     mural em uma coluna, lista vazia) continua o mesmo de antes.
+   ========================================================== */
+
+/* ---------- 1. VARIÁVEIS (edite aqui para mudar o visual todo) ---------- */
+:root {
+  /* Cores base */
+  --tinta: #151a46;
+  --tinta-2: #26307a;
+  --papel: #f7f3ea;
+  --superficie: #ffffff;
+  --texto: #1f2240;
+  --suave: #666b88;
+  --cor-borda: #e7e2d3;
+
+  /* Cores de destaque (uma por seção) */
+  --ouro: #ffc20e;
+  --verde: #138a7a;
+  --azul: #2c59d6;
+  --coral: #e8552d;
+  --roxo: #7b4bc4;
+  --rosa: #d6336c;
+  --turquesa: #0b8fb3;
+
+  /* Destaque padrão (cada seção troca esses dois valores, ver parte 3) */
+  --destaque: var(--azul);
+  --destaque-texto: #ffffff;
+
+  /* Mural (visual claro) */
+  --mural-card: #ffffff;
+  --mural-borda: #f1e9cf;
+  --mural-selo: #fff1bd;
+  --mural-selo-texto: #6b4f00;
+
+  /* Medidas e efeitos */
+  --raio: 16px;
+  --largura-max: 1200px;
+  --sombra: 0 1px 2px rgba(21, 26, 70, 0.06), 0 6px 20px rgba(21, 26, 70, 0.07);
+  --sombra-hover: 0 2px 4px rgba(21, 26, 70, 0.08), 0 16px 36px rgba(21, 26, 70, 0.15);
+  --sombra-suave: 0 1px 2px rgba(21, 26, 70, 0.04), 0 4px 14px rgba(21, 26, 70, 0.05);
+
+  /* Fontes */
+  --fonte-titulo: "Fraunces", Georgia, "Times New Roman", serif;
+  --fonte-texto: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Modo escuro (segue a preferência do aparelho) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papel: #0e1130;
+    --superficie: #1a1f4a;
+    --texto: #eceefb;
+    --suave: #a6abcc;
+    --cor-borda: #2d346b;
+    --mural-card: var(--superficie);
+    --mural-borda: var(--cor-borda);
+    --mural-selo: rgba(255, 194, 14, 0.18);
+    --mural-selo-texto: #ffd96b;
+    --sombra: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.3);
+    --sombra-hover: 0 2px 4px rgba(0, 0, 0, 0.4), 0 16px 36px rgba(0, 0, 0, 0.5);
+    --sombra-suave: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* ---------- 2. BASE ---------- */
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  height: 100dvh; /* altura "de verdade" no celular (descontando a barra do navegador) */
+  display: flex;
+  flex-direction: column;
+  font-family: var(--fonte-texto);
+  font-size: 1rem;
+  color: var(--texto);
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  background:
+    radial-gradient(700px 420px at 100% 0%, color-mix(in srgb, var(--ouro) 18%, transparent), transparent 70%),
+    radial-gradient(600px 420px at 0% 100%, color-mix(in srgb, var(--azul) 8%, transparent), transparent 70%),
+    var(--papel);
+}
+
+/* Foco visível para quem navega pelo teclado */
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--ouro);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Imagens ainda sem arquivo (antes do JS preencher) não mostram o ícone de "imagem quebrada" */
+.banner:not([src]), .banner[src=""],
+.foto-circular:not([src]), .foto-circular[src=""] { visibility: hidden; }
+
+/* ---------- 3. COR DE DESTAQUE DE CADA SEÇÃO (vale também para o link do nav) ---------- */
+#mural, nav a[href="#mural"]                     { --destaque: var(--ouro);  --destaque-texto: #1f2240; }
+#esportes, nav a[href="#esportes"]               { --destaque: var(--verde); --destaque-texto: #ffffff; }
+#noticias, nav a[href="#noticias"]               { --destaque: var(--azul);  --destaque-texto: #ffffff; }
+#entrevistas, nav a[href="#entrevistas"]         { --destaque: var(--coral); --destaque-texto: #ffffff; }
+#resenha-critica, nav a[href="#resenha-critica"] { --destaque: var(--roxo);  --destaque-texto: #ffffff; }
+#opiniao, nav a[href="#opiniao"]                 { --destaque: var(--rosa);  --destaque-texto: #ffffff; }
+#artes, nav a[href="#artes"]                     { --destaque: var(--turquesa); --destaque-texto: #ffffff; }
+
+/* ---------- 4. NAV (acima do header) ---------- */
+nav {
+  position: relative;
+  z-index: 2;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--cor-borda);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+nav ul {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.4rem max(0.75rem, env(safe-area-inset-left, 0px));
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+nav ul::-webkit-scrollbar { display: none; }
+
+/* centraliza quando cabe, rola quando não cabe */
+nav li { flex: none; scroll-snap-align: center; }
+nav li:first-child { margin-left: auto; }
+nav li:has(+ .nav-secreto),
+nav li:last-child:not(.nav-secreto) { margin-right: auto; }
+
+nav a {
+  display: flex;
+  align-items: center;
+  min-height: 44px; /* alvo de toque confortável */
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--texto);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Tópico ativo.
+   - Sem JS: destaca o tópico aberto pelo link do nav (:target).
+     Se nada foi aberto ainda, destaca o Mural (página inicial).
+   - Com JS: basta colocar a classe "ativo" no link do tópico visível. */
+nav a.ativo,
+nav a[aria-current="true"],
+body:not(.js):not(:has(.topico:target)) nav a[href="#mural"],
+body:not(.js):has(#mural:target) nav a[href="#mural"],
+body:not(.js):has(#esportes:target) nav a[href="#esportes"],
+body:not(.js):has(#noticias:target) nav a[href="#noticias"],
+body:not(.js):has(#entrevistas:target) nav a[href="#entrevistas"],
+body:not(.js):has(#resenha-critica:target) nav a[href="#resenha-critica"],
+body:not(.js):has(#opiniao:target) nav a[href="#opiniao"],
+body:not(.js):has(#artes:target) nav a[href="#artes"] {
+  background: var(--destaque);
+  color: var(--destaque-texto);
+}
+
+/* ---------- 5. HEADER (logo + título + lema) ---------- */
+header {
+  position: relative;
+  overflow: hidden;
+  padding: 0.9rem max(1rem, env(safe-area-inset-left, 0px)) 1.2rem;
+  color: #f7f3ea;
+  background:
+    radial-gradient(500px 220px at 8% -30%, rgba(255, 194, 14, 0.28), transparent 70%),
+    radial-gradient(460px 220px at 100% 130%, rgba(44, 89, 214, 0.55), transparent 70%),
+    var(--tinta);
+}
+
+/* textura de pontinhos */
+header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1.6px);
+  background-size: 18px 18px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  pointer-events: none;
+}
+
+/* faixa colorida na base: uma cor para cada seção, na ordem do nav */
+header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--ouro) 0 14.285%,
+    var(--verde) 14.285% 28.571%,
+    var(--azul) 28.571% 42.857%,
+    var(--coral) 42.857% 57.142%,
+    var(--roxo) 57.142% 71.428%,
+    var(--rosa) 71.428% 85.714%,
+    var(--turquesa) 85.714% 100%
+  );
+}
+
+.marca {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  max-width: var(--largura-max);
+  margin: 0 auto;
+}
+
+.logo {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.5)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
+  transition: transform 0.3s;
+}
+
+.sobretitulo { display: none; }
+
+header h1 {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-size: clamp(1.4rem, 6.4vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+}
+header h1 span { color: var(--ouro); }
+
+.lema {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: rgba(247, 243, 234, 0.85);
+}
+
+/* ---------- 6. PAINEL DE TÓPICOS: um ao lado do outro, rolagem para o lado ---------- */
+#painel-topicos {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain; /* evita "voltar página" sem querer ao arrastar */
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+#painel-topicos::-webkit-scrollbar { display: none; }
+
+.topico {
+  flex: 0 0 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.25rem max(1rem, env(safe-area-inset-right, 0px)) 2rem max(1rem, env(safe-area-inset-left, 0px));
+  scroll-snap-align: start;
+  scroll-snap-stop: always; /* um dedo = um tópico */
+}
+.topico[hidden] { display: none; }
+.topico:focus, .topico:target { outline: none; }
+
+/* Título de cada tópico: marcador na cor da seção + linha */
+.topico > h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 0 1.25rem;
+  font-family: var(--fonte-titulo);
+  font-size: clamp(1.7rem, 7vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.topico > h2::before {
+  content: "";
+  flex: none;
+  width: 0.45em;
+  height: 0.9em;
+  border-radius: 4px;
+  background: var(--destaque);
+}
+.topico > h2::after {
+  content: "";
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--destaque), transparent);
+  opacity: 0.7;
+}
+
+/* ---------- 7. LISTA DE CARTÕES ---------- */
+.lista {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr; /* celular: uma coluna */
+}
+
+/* Mural: uma coluna só, avisos empilhados */
+#mural .lista { max-width: 720px; }
+#mural > h2 { max-width: 720px; }
+
+/* Cartões entram suavemente (também os que o JS inserir depois) */
+@keyframes subir {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.lista > .cartao { animation: subir 0.45s ease backwards; }
+.lista > .cartao:nth-child(2) { animation-delay: 0.05s; }
+.lista > .cartao:nth-child(3) { animation-delay: 0.1s; }
+.lista > .cartao:nth-child(4) { animation-delay: 0.15s; }
+.lista > .cartao:nth-child(5) { animation-delay: 0.2s; }
+.lista > .cartao:nth-child(n+6) { animation-delay: 0.25s; }
+
+/* ---------- 8. CARTÕES ---------- */
+.cartao {
+  background: var(--superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: 1.1rem;
+  box-shadow: var(--sombra);
+}
+
+/* --- Aviso do mural (visual claro e leve) --- */
+.cartao-aviso {
+  position: relative;
+  padding: 1.1rem 1.1rem 1rem 1.25rem;
+  background: var(--mural-card);
+  border: 1px solid var(--mural-borda);
+  border-left: 5px solid color-mix(in srgb, var(--ouro) 75%, #ffffff);
+  border-radius: 18px;
+  box-shadow: var(--sombra-suave);
+}
+.selo {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--azul) 10%, transparent);
+  color: var(--azul);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.cartao-aviso h3 {
+  margin: 0 0 0.4rem;
+  font-family: var(--fonte-titulo);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.cartao-aviso p { margin: 0 0 0.85rem; color: var(--texto); }
+.cartao-aviso .meta {
+  margin: 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--mural-borda);
+}
+.cartao-aviso small { color: var(--suave); font-size: 0.82rem; }
+
+/* O primeiro aviso da lista (o mais recente) ganha um leve destaque + etiqueta */
+.lista > .cartao-aviso:first-child {
+  background: color-mix(in srgb, var(--ouro) 9%, var(--mural-card));
+}
+.lista > .cartao-aviso:first-child::after {
+  content: "Mais recente";
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: var(--mural-selo);
+  color: var(--mural-selo-texto);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* --- Cartão de postagem: banner + etiqueta + título + autor --- */
+.cartao-postagem {
+  padding: 0;
+  overflow: hidden;
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+.cartao-postagem > a {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.banner-caixa {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 2 / 1;
+  background: linear-gradient(135deg, var(--destaque), var(--tinta-2));
+}
+.banner {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+}
+.banner-caixa .banner {
+  height: 100%;
+  transition: transform 0.6s;
+}
+
+.tag {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: var(--destaque);
+  color: var(--destaque-texto);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.tag:empty { display: none; }
+
+/* Artes: galeria, com banner mais alto para valorizar a imagem */
+#artes .banner-caixa { aspect-ratio: 4 / 3; }
+
+.cartao-corpo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem 1.1rem;
+}
+.cartao-postagem h3 {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.autor {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.autor span { display: flex; flex-direction: column; line-height: 1.25; }
+.autor small { color: var(--suave); }
+
+/* ---------- 9. LEITURA DE UMA MATÉRIA ---------- */
+#leitura > * { max-width: 760px; margin-left: auto; margin-right: auto; }
+#leitura > #btn-voltar { margin-left: max(0px, calc((100% - 760px) / 2)); margin-right: 0; }
+
+#btn-voltar {
+  display: block;
+  min-height: 44px;
+  margin-bottom: 1rem;
+  padding: 0.55rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tinta);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+#leitura .cartao {
+  padding: 1.25rem;
+  border-top: 6px solid var(--destaque);
+}
+#leitura .cartao h2 {
+  margin: 0 0 1rem;
+  font-family: var(--fonte-titulo);
+  font-size: clamp(1.55rem, 6vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+#leitura .banner {
+  height: auto;
+  aspect-ratio: 2 / 1;
+  margin-bottom: 1.25rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--destaque), var(--tinta-2));
+}
+
+/* Texto vindo do .md */
+[data-campo="conteudo"] { font-size: 1.02rem; line-height: 1.75; overflow-wrap: anywhere; }
+[data-campo="conteudo"] p { margin: 0 0 1.1rem; }
+[data-campo="conteudo"] h2,
+[data-campo="conteudo"] h3 {
+  margin: 1.75rem 0 0.6rem;
+  font-family: var(--fonte-titulo);
+  line-height: 1.25;
+}
+[data-campo="conteudo"] a { color: var(--azul); }
+[data-campo="conteudo"] img { max-width: 100%; height: auto; border-radius: 10px; }
+[data-campo="conteudo"] blockquote {
+  margin: 1.5rem 0;
+  padding: 0.75rem 1.1rem;
+  border-left: 4px solid var(--ouro);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--ouro) 16%, transparent);
+  font-family: var(--fonte-titulo);
+  font-size: 1.1rem;
+}
+/* letra capitular no primeiro parágrafo */
+[data-campo="conteudo"] > p:first-of-type::first-letter {
+  float: left;
+  padding: 0.08em 0.12em 0 0;
+  font-family: var(--fonte-titulo);
+  font-size: 3.4em;
+  font-weight: 800;
+  line-height: 0.85;
+  color: var(--azul);
+}
+
+/* ---------- 10. CRÉDITOS DO JORNALISTA ---------- */
+.foto-circular {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--superficie);
+  box-shadow: 0 0 0 2px var(--azul);
+  background: var(--papel);
+}
+.foto-mini { width: 36px; height: 36px; border-width: 2px; box-shadow: 0 0 0 1.5px var(--destaque); }
+
+.credito-jornalista {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+.credito-jornalista strong { font-size: 1.02rem; }
+.credito-jornalista small { color: var(--suave); }
+
+/* ---------- 11. MENSAGEM DE LISTA VAZIA ---------- */
+.vazio {
+  max-width: 720px;
+  margin: 0;
+  padding: 1.75rem 1rem 2rem;
+  border: 2px dashed var(--cor-borda);
+  border-radius: var(--raio);
+  text-align: center;
+  color: var(--suave);
+}
+.vazio::before {
+  content: "\201C";
+  display: block;
+  font-family: var(--fonte-titulo);
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 0.9;
+  color: var(--destaque);
+}
+.lista:not(:empty) + .vazio { display: none; }
+
+/* ---------- 12. RODAPÉ ---------- */
+footer {
+  padding: 0.5rem max(1rem, env(safe-area-inset-left, 0px)) max(0.5rem, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--cor-borda);
+  background: var(--superficie);
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--suave);
+}
+footer p { margin: 0; }
+
+/* ==========================================================
+   TELAS MAIORES (cada bloco só acrescenta ao anterior)
+   ========================================================== */
+
+/* ---- 640px: celular grande / tablet pequeno ---- */
+@media (min-width: 640px) {
+  nav ul { padding-left: 1.5rem; padding-right: 1.5rem; }
+  nav a { padding: 0.5rem 1.15rem; font-size: 0.95rem; }
+
+  header { padding: 1.4rem 1.5rem 1.7rem; }
+  header::after { height: 5px; }
+  .marca { justify-content: center; gap: 1.1rem; }
+  .logo { width: 76px; height: 76px; }
+  .sobretitulo {
+    display: block;
+    margin: 0 0 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ouro);
+  }
+  header h1 { font-size: clamp(1.9rem, 4.6vw, 2.6rem); }
+  .lema { margin-top: 0.4rem; font-size: 0.98rem; max-width: 36rem; }
+
+  .topico { padding: 1.75rem 1.5rem 2.5rem; }
+  .topico > h2 { margin-bottom: 1.5rem; }
+
+  /* 2 ou mais colunas, conforme a largura disponível */
+  .lista { gap: 1.25rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  #mural .lista { grid-template-columns: 1fr; }
+
+  .cartao-aviso { padding: 1.35rem 1.5rem 1.15rem 1.6rem; }
+  .cartao-aviso h3 { font-size: 1.4rem; }
+  .cartao-aviso p { font-size: 1.05rem; }
+  .lista > .cartao-aviso:first-child::after { top: 1.25rem; right: 1.25rem; }
+
+  #leitura .cartao { padding: 2rem; }
+  [data-campo="conteudo"] { font-size: 1.08rem; line-height: 1.8; }
+
+  footer { font-size: 0.78rem; }
+}
+
+/* ---- 960px: tablet / notebook ---- */
+@media (min-width: 960px) {
+  .logo { width: 92px; height: 92px; }
+  header { padding: 1.6rem 2rem 1.9rem; }
+
+  .topico { padding: 2rem 2rem 3rem; }
+  .lista { gap: 1.5rem; }
+}
+
+/* ---- 1280px: desktop (conteúdo centralizado, com largura máxima) ---- */
+@media (min-width: 1280px) {
+  .topico {
+    padding-left: max(2rem, calc((100% - var(--largura-max)) / 2));
+    padding-right: max(2rem, calc((100% - var(--largura-max)) / 2));
+  }
+}
+
+/* ---- Celular deitado / telas muito baixas: compacta o topo ---- */
+@media (max-height: 520px) {
+  nav ul { padding-top: 0.15rem; padding-bottom: 0.15rem; }
+  nav a { min-height: 38px; }
+  header { padding-top: 0.5rem; padding-bottom: 0.7rem; }
+  .logo { width: 44px; height: 44px; }
+  .sobretitulo, .lema { display: none; }
+  header h1 { font-size: 1.35rem; }
+  footer { display: none; }
+}
+
+/* ---- Efeitos de passar o mouse só em aparelhos que têm mouse ---- */
+@media (hover: hover) {
+  nav a:hover { background: color-mix(in srgb, var(--destaque) 18%, transparent); }
+  .logo:hover { transform: rotate(-6deg) scale(1.05); }
+  .cartao-postagem:hover { transform: translateY(-4px); box-shadow: var(--sombra-hover); }
+  .cartao-postagem:hover .banner { transform: scale(1.06); }
+  .cartao-postagem:hover h3 {
+    text-decoration: underline;
+    text-decoration-color: var(--destaque);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 4px;
+  }
+  #btn-voltar:hover { background: var(--azul); transform: translateX(-3px); }
+}
+
+/* Respeita quem prefere menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  #painel-topicos { scroll-behavior: auto; }
+  .lista > .cartao { animation: none; }
+  .cartao-postagem, .banner-caixa .banner, .logo, #btn-voltar { transition: none; }
+  .cartao-postagem:hover, .cartao-postagem:hover .banner { transform: none; }
+}
+
+/* ==========================================================
+   ÁREA SECRETA: login, barra do jornalista, editor
+   (mobile-first, usa as mesmas variáveis do resto do site)
+   ========================================================== */
+
+/* Item "Login" do nav: existe no HTML, mas ninguém vê nem foca */
+.nav-secreto { display: none; }
+
+/* Telas cheias (login e editor): escondem cabeçalho, nav, mural e rodapé */
+body.modo-tela-cheia > nav,
+body.modo-tela-cheia > header,
+body.modo-tela-cheia > main,
+body.modo-tela-cheia > footer,
+body.modo-tela-cheia > .barra-jornalista { display: none !important; }
+
+.tela-cheia {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(1.25rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1.25rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+}
+.tela-cheia[hidden] { display: none; }
+.tela-editor { align-items: flex-start; }
+
+/* ---------- Botões ---------- */
+.btn-principal {
+  min-height: 48px;
+  padding: 0.75rem 1.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--azul);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s, opacity 0.2s;
+}
+.btn-principal:disabled { opacity: 0.6; cursor: progress; }
+
+.btn-pilula {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0.45rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tinta);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn-claro {
+  background: transparent;
+  color: inherit;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.btn-pilula[hidden] { display: none; }
+
+/* ---------- Formulários ---------- */
+.texto-suave { margin: 0; color: var(--suave); font-size: 0.9rem; line-height: 1.5; }
+.texto-suave code { padding: 0.1rem 0.35rem; border-radius: 6px; background: color-mix(in srgb, var(--azul) 10%, transparent); }
+
+.campo { display: flex; flex-direction: column; gap: 0.4rem; text-align: left; }
+.campo > span { font-size: 0.85rem; font-weight: 600; }
+
+.campo input[type="text"],
+.campo input[type="password"],
+.campo select,
+.campo textarea {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  font: inherit;
+  font-size: 1rem; /* 16px: evita o zoom automático no iPhone */
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1.5px solid var(--cor-borda);
+  border-radius: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus {
+  outline: none;
+  border-color: var(--azul);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--azul) 22%, transparent);
+}
+.campo textarea { min-height: 12rem; line-height: 1.6; resize: vertical; }
+
+.mensagem {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--azul) 10%, var(--superficie));
+  color: var(--texto);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: left;
+}
+.mensagem.erro { background: color-mix(in srgb, #d92d20 12%, var(--superficie)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #d92d20 40%, transparent); }
+.mensagem.ok { background: color-mix(in srgb, var(--verde) 14%, var(--superficie)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--verde) 40%, transparent); }
+.mensagem[hidden] { display: none; }
+
+/* ---------- Tela de login ---------- */
+.cartao-login {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.75rem 1.4rem;
+  text-align: center;
+  border-top: 6px solid var(--ouro);
+}
+.logo-login { width: 72px; height: 72px; margin: 0 auto; }
+.cartao-login h1 {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-size: 1.6rem;
+  line-height: 1.15;
+}
+.link-voltar { font-size: 0.88rem; color: var(--suave); text-decoration: none; }
+.link-voltar:hover { text-decoration: underline; }
+
+/* ---------- Barra "Área do jornalista" ---------- */
+.barra-jornalista {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  padding: 0.5rem max(1rem, env(safe-area-inset-left, 0px));
+  background: var(--ouro);
+  color: #1f2240;
+  font-size: 0.9rem;
+}
+.barra-jornalista[hidden] { display: none; }
+.barra-nome:not(:empty)::before { content: "· "; }
+.barra-acoes { display: flex; gap: 0.5rem; margin-left: auto; }
+.barra-jornalista .btn-pilula { background: #1f2240; color: #ffffff; }
+.barra-jornalista .btn-claro { background: transparent; color: #1f2240; }
+
+/* ---------- Botão "Criar nova postagem" (no lugar de "Nenhuma postagem ainda") ---------- */
+.cartao-novo {
+  appearance: none;
+  width: 100%;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  font: inherit;
+  color: var(--texto);
+  text-align: center;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--destaque) 7%, var(--superficie));
+  border: 2px dashed var(--destaque);
+  box-shadow: none;
+  transition: background-color 0.2s, transform 0.2s;
+}
+.novo-mais {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--destaque);
+  color: var(--destaque-texto);
+  font-size: 2rem;
+  font-weight: 300;
+  line-height: 1;
+}
+.novo-texto { font-family: var(--fonte-titulo); font-size: 1.15rem; font-weight: 700; }
+
+/* ---------- Editor de postagem ---------- */
+.cartao-editor {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1.25rem;
+  border-top: 6px solid var(--azul);
+}
+.editor-topo { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.editor-topo h1 { margin: 0; font-family: var(--fonte-titulo); font-size: 1.5rem; line-height: 1.15; }
+.editor-acoes { display: flex; justify-content: flex-end; }
+
+.previa-imagem {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  overflow: hidden;
+  border: 2px dashed var(--cor-borda);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--azul) 5%, var(--superficie));
+  color: var(--suave);
+  font-size: 0.88rem;
+  text-align: center;
+}
+.previa-imagem img { grid-area: 1 / 1; width: 100%; height: 100%; object-fit: cover; }
+.previa-imagem p { grid-area: 1 / 1; margin: 0; padding: 1rem; }
+.previa-imagem p[hidden], .previa-imagem img[hidden] { display: none; }
+.previa-imagem.tem-imagem { border-style: solid; border-color: var(--azul); }
+.previa-acoes { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+.btn-arquivo { position: relative; cursor: pointer; }
+.btn-arquivo input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.btn-arquivo:focus-within { outline: 3px solid var(--ouro); outline-offset: 2px; }
+
+@media (min-width: 640px) {
+  .cartao-login { padding: 2.25rem 2rem; }
+  .cartao-editor { padding: 2rem; }
+}
+
+@media (hover: hover) {
+  .btn-principal:hover:not(:disabled) { background: var(--azul-escuro, #1c3fa5); transform: translateY(-1px); }
+  .cartao-novo:hover { background: color-mix(in srgb, var(--destaque) 14%, var(--superficie)); transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-principal, .cartao-novo { transition: none; }
+  .cartao-novo:hover { transform: none; }
+}
+
+/* Imagens escondidas pelo JS (sem foto / sem banner) */
+img[hidden] { display: none !important; }

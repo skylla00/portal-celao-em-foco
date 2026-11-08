@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#151a46">
+  <title>Portal Celao em Foco</title>
+
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <!-- Fontes (opcional: sem internet, o navegador usa Georgia / fonte do sistema) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ========== BARRA DA ÁREA DO JORNALISTA (aparece só depois do login) ========== -->
+  <div id="barra-jornalista" class="barra-jornalista" hidden>
+    <strong class="barra-titulo">Área do jornalista</strong>
+    <span class="barra-nome" data-campo="nome-jornalista"></span>
+    <span class="barra-acoes">
+      <button type="button" id="btn-visitante" class="btn-pilula">Ver site público</button>
+      <button type="button" id="btn-sair" class="btn-pilula btn-claro">Sair</button>
+    </span>
+  </div>
+
+  <!-- ========== NAV (fica acima do header) ========== -->
+  <nav aria-label="Tópicos do portal">
+    <ul>
+      <li><a href="#mural">Mural de Avisos</a></li>
+      <li><a href="#esportes">Esportes</a></li>
+      <li><a href="#noticias">Notícias</a></li>
+      <li><a href="#entrevistas">Entrevistas</a></li>
+      <li><a href="#resenha-critica">Resenha Crítica</a></li>
+      <li><a href="#opiniao">Opinião</a></li>
+      <li><a href="#artes">Artes</a></li>
+      <!-- Item SECRETO: existe no código, mas fica escondido por CSS (.nav-secreto).
+           Só se chega aqui digitando o endereço do site com #login no final. -->
+      <li class="nav-secreto"><a href="#login" tabindex="-1">Login</a></li>
+    </ul>
+  </nav>
+
+  <!-- ========== HEADER ========== -->
+  <header>
+    <div class="marca">
+      <img class="logo" src="logo.svg" alt="Logotipo do Portal Celao em Foco" width="72" height="72">
+      <div class="marca-texto">
+        <p class="sobretitulo">Jornal escolar &middot; Colégio Estadual Luiz Alves de Oliveira</p>
+        <h1>Portal Celao <span>em Foco</span></h1>
+        <p class="lema"><em>"Nossa escola, nossas vozes: Por uma educação antirracista"</em></p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========== TÓPICOS (um ao lado do outro) ==========
+       Cada <section class="topico"> é uma "página".
+       O nav leva até ela e também dá para arrastar/rolar para o lado.
+       Os containers .lista começam VAZIOS: o JavaScript vai inserir
+       os cartões usando os <template> lá embaixo. -->
+  <main id="painel-topicos">
+
+    <!-- Mural de Avisos (página inicial) -->
+    <section class="topico" id="mural" data-topico="mural">
+      <h2>Mural de Avisos</h2>
+      <!-- JS: inserir o aviso mais novo SEMPRE no começo (prepend) -->
+      <div class="lista" id="lista-mural"></div>
+      <p class="vazio">Nenhum aviso publicado ainda.</p>
+    </section>
+
+    <section class="topico" id="esportes" data-topico="esportes">
+      <h2>Esportes</h2>
+      <div class="lista" id="lista-esportes"></div>
+      <p class="vazio">Nenhuma postagem ainda.</p>
+    </section>
+
+    <section class="topico" id="noticias" data-topico="noticias">
+      <h2>Notícias</h2>
+      <div class="lista" id="lista-noticias"></div>
+      <p class="vazio">Nenhuma postagem ainda.</p>
+    </section>
+
+    <section class="topico" id="entrevistas" data-topico="entrevistas">
+      <h2>Entrevistas</h2>
+      <div class="lista" id="lista-entrevistas"></div>
+      <p class="vazio">Nenhuma postagem ainda.</p>
+    </section>
+
+    <section class="topico" id="resenha-critica" data-topico="resenha-critica">
+      <h2>Resenha Crítica</h2>
+      <div class="lista" id="lista-resenha-critica"></div>
+      <p class="vazio">Nenhuma postagem ainda.</p>
+    </section>
+
+    <!-- Opinião: textos de opinião dos artistas e da comunidade escolar -->
+    <section class="topico" id="opiniao" data-topico="opiniao">
+      <h2>Opinião</h2>
+      <div class="lista" id="lista-opiniao"></div>
+      <p class="vazio">Nenhuma opinião publicada ainda.</p>
+    </section>
+
+    <!-- Artes: galeria com as artes da escola -->
+    <section class="topico" id="artes" data-topico="artes">
+      <h2>Artes</h2>
+      <div class="lista" id="lista-artes"></div>
+      <p class="vazio">Nenhuma arte publicada ainda.</p>
+    </section>
+
+    <!-- Leitura de uma postagem (aparece só quando o JS abrir uma matéria).
+         Fica escondida e fora do nav. O JS remove o atributo "hidden",
+         preenche os campos [data-campo] com o conteúdo do .md e
+         leva a rolagem até aqui. -->
+    <section class="topico" id="leitura" hidden>
+      <button type="button" id="btn-voltar">&larr; Voltar</button>
+
+      <!-- Créditos: aparecem ANTES do cartão da matéria -->
+      <figure class="credito-jornalista">
+        <img class="foto-circular" data-campo="foto-jornalista" src="" alt="">
+        <figcaption>
+          <strong data-campo="nome-jornalista"></strong><br>
+          <small>Publicado em <time data-campo="data-publicacao"></time></small>
+        </figcaption>
+      </figure>
+
+      <!-- Cartão com o conteúdo do .md já convertido em HTML -->
+      <article class="cartao">
+        <h2 data-campo="titulo"></h2>
+        <img class="banner" data-campo="banner" src="" alt="">
+        <div data-campo="conteudo"></div>
+      </article>
+    </section>
+
+  </main>
+
+  <!-- ========== RODAPÉ ========== -->
+  <footer>
+    <p>Portal Celao em Foco &middot; Colégio Estadual Luiz Alves de Oliveira</p>
+    <!-- LOGIN ESCONDIDO (fazer depois): um link discreto aqui, só para direção e jornalistas. -->
+  </footer>
+
+  <!-- ========== TELA DE LOGIN (secreta: só abre com #login) ========== -->
+  <section id="tela-login" class="tela-cheia" hidden aria-labelledby="titulo-login">
+    <form id="form-login" class="cartao cartao-login" novalidate>
+      <img class="logo-login" src="logo.svg" alt="" width="72" height="72">
+      <h1 id="titulo-login">Acesso restrito</h1>
+      <p class="texto-suave">Entre com a sua conta para publicar no Portal Celao em Foco.</p>
+
+      <label class="campo">
+        <span>Usuário ou e-mail</span>
+        <input id="login-usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </label>
+      <label class="campo">
+        <span>Senha</span>
+        <input id="login-senha" name="senha" type="password" autocomplete="current-password" required>
+      </label>
+
+      <p id="login-erro" class="mensagem erro" role="alert" hidden></p>
+      <button type="submit" id="btn-entrar" class="btn-principal">Entrar</button>
+      <a class="link-voltar" href="#mural">&larr; Voltar ao site</a>
+    </form>
+  </section>
+
+  <!-- ========== TELA DO EDITOR (o formulário é criado pelo JS só depois de confirmar o jornalista) ========== -->
+  <section id="tela-editor" class="tela-cheia tela-editor" hidden aria-label="Editor de postagem"></section>
+
+  <!-- ========== MODELOS PADRONIZADOS (usados pelo JavaScript) ==========
+       Para mudar o visual de TODOS os avisos ou TODAS as postagens,
+       edite apenas o modelo correspondente aqui. -->
+
+  <!-- Modelo de AVISO do mural -->
+  <template id="modelo-aviso">
+    <article class="cartao cartao-aviso">
+      <span class="selo">Aviso</span>
+      <h3 data-campo="titulo"></h3>
+      <p data-campo="texto"></p>
+      <p class="meta">
+        <small>
+          Publicado em <time data-campo="data-publicacao"></time>
+          por <span data-campo="autor"></span>
+        </small>
+      </p>
+    </article>
+  </template>
+
+  <!-- Modelo de CARTÃO de postagem (Esportes, Notícias, Entrevistas, Resenha) -->
+  <template id="modelo-cartao-postagem">
+    <article class="cartao cartao-postagem">
+      <a href="#leitura" data-campo="link">
+        <div class="banner-caixa">
+          <img class="banner" data-campo="banner" src="" alt="">
+          <span class="tag" data-campo="categoria"></span>
+        </div>
+        <div class="cartao-corpo">
+          <h3 data-campo="titulo"></h3>
+          <div class="autor">
+            <img class="foto-circular foto-mini" data-campo="foto-jornalista" src="" alt="">
+            <span>
+              <strong data-campo="nome-jornalista"></strong>
+              <small><time data-campo="data-publicacao"></time></small>
+            </span>
+          </div>
+        </div>
+      </a>
+    </article>
+  </template>
+
+  <!-- Botão "Criar nova postagem": aparece no lugar de "Nenhuma postagem ainda" para o jornalista -->
+  <template id="modelo-nova-postagem">
+    <button type="button" class="cartao cartao-novo" data-campo="novo">
+      <span class="novo-mais" aria-hidden="true">+</span>
+      <span class="novo-texto">Criar nova postagem</span>
+    </button>
+  </template>
+
+  <!-- Formulário do editor de postagem -->
+  <template id="modelo-editor">
+    <form class="cartao cartao-editor" novalidate>
+      <div class="editor-topo">
+        <h1>Nova postagem</h1>
+        <button type="button" class="btn-pilula btn-claro" data-acao="cancelar">Cancelar</button>
+      </div>
+
+      <label class="campo">
+        <span>Título</span>
+        <input name="titulo" type="text" maxlength="140" required placeholder="Ex.: Feira de ciências reúne todas as turmas">
+      </label>
+
+      <label class="campo">
+        <span>Categoria</span>
+        <select name="categoria" required>
+          <option value="esportes">Esportes</option>
+          <option value="noticias">Notícias</option>
+          <option value="entrevistas">Entrevistas</option>
+          <option value="resenha-critica">Resenha Crítica</option>
+          <option value="opiniao">Opinião</option>
+          <option value="artes">Artes</option>
+        </select>
+      </label>
+
+      <div class="campo">
+        <span>Imagem de resumo</span>
+        <div class="previa-imagem" data-campo="previa">
+          <img alt="Pré-visualização da imagem de resumo" hidden>
+          <p>Imagem horizontal 16:9 (ideal: 1280&times;720).<br>Ela será ajustada automaticamente.</p>
+        </div>
+        <div class="previa-acoes">
+          <label class="btn-pilula btn-arquivo">
+            Escolher imagem
+            <input name="imagem" type="file" accept="image/jpeg,image/png,image/webp">
+          </label>
+          <button type="button" class="btn-pilula btn-claro" data-acao="remover-imagem" hidden>Remover</button>
+        </div>
+      </div>
+
+      <label class="campo">
+        <span>Conteúdo da reportagem</span>
+        <textarea name="conteudo" rows="14" maxlength="20000" required placeholder="Escreva aqui a sua reportagem…"></textarea>
+        <small class="texto-suave">
+          Texto simples (sem imagens por enquanto). Deixe uma linha em branco entre os parágrafos.
+          Comece uma linha com <code>## </code> para criar um subtítulo ou com <code>&gt; </code> para uma citação.
+        </small>
+      </label>
+
+      <p class="mensagem" role="status" data-campo="mensagem" hidden></p>
+      <div class="editor-acoes">
+        <button type="submit" class="btn-principal" data-campo="publicar">Publicar</button>
+      </div>
+    </form>
+  </template>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
