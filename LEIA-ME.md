@@ -9,11 +9,12 @@ Nada aqui foi configurado por mim: serviços externos, chaves e deploy ficam com
 public/            ← site público (a Vercel serve só esta pasta)
   index.html  style.css  script.js  logo.svg
 api/               ← rotas serverless da Vercel
-  postagens.js     GET (público) e POST (só jornalista)
+  postagens.js     GET (público), POST e DELETE (só jornalista)
+  perfil.js        PUT: o jornalista edita o PRÓPRIO perfil (nome, bio, foto)
   sessao.js        GET: confirma no servidor se a sessão é de jornalista
   config.js        GET: entrega só a chave PÚBLICA do Clerk
 lib/               ← código compartilhado da API (não fica público)
-  auth.js  db.js  http.js  validar.js
+  auth.js  db.js  http.js  perfil.js  validar.js
 schema.sql         ← tabela do Neon (rode uma vez)
 package.json  vercel.json  .env.example  .gitignore
 ```
@@ -37,7 +38,8 @@ Para testar localmente (opcional): `npm i -g vercel`, depois `vercel link`, `ver
 ## 3. Neon (banco)
 
 1. No projeto da Vercel: **Storage → Create Database → Neon** (Marketplace) e conecte ao projeto. A variável `DATABASE_URL` é criada sozinha.
-2. Abra o **SQL Editor** do Neon e rode o conteúdo de `schema.sql`.
+2. Abra o **SQL Editor** do Neon e rode o conteúdo de `schema.sql`. Ele pode ser rodado de novo
+   a qualquer momento (não apaga nada): quando houver atualização do projeto, rode-o **antes** de enviar o código novo.
 
 ## 4. Vercel Blob (imagens de resumo)
 
@@ -94,3 +96,11 @@ O item "Login" existe no menu, mas fica escondido por CSS. A proteção de verda
 - **GitHub Pages**: não executa API nem banco, então login e publicação **não funcionam lá**. O site em si abre, mas sem postagens. O caminho é a Vercel.
 - **Mural de avisos**: continua como antes (sem publicação). Esta entrega cobre as postagens das 6 categorias.
 - Limite de 4,5 MB por requisição na Vercel: a imagem é reduzida no navegador para 1280×720 (JPEG) antes de enviar.
+
+## 10. Área do jornalista (recursos)
+
+- **Perfil**: clique na foto/nome no canto superior direito. O nome de exibição começa igual ao nome de usuário do Clerk e pode ser trocado livremente (maiúsculas, acentos, espaços). O nome de usuário não muda nem aparece no site. A foto fica no Blob. Ao trocar o nome ou a foto, as matérias antigas mostram o novo (o site busca o perfil atual do autor).
+- **Anexar arquivo .md**: carrega o texto do arquivo no campo de conteúdo. Se o arquivo começar com `# Título` e o título estiver vazio, essa linha vira o título. Imagens no .md precisam ser links `https://...`.
+- **Markdown aceito**: `#`/`##` subtítulo, `###` subtítulo menor, `>` citação, listas (`-` e `1.`), `---`, `**negrito**`, `*itálico*`, `` `código` ``, `[texto](https://link)`, `![descrição](https://imagem)`. HTML escrito no texto aparece como texto (nunca é executado).
+- **Imagem do final**: opcional, sem formato fixo (o maior lado é limitado a 1600 px), aparece sempre depois do texto.
+- **Excluir**: lixeira no canto superior esquerdo de cada cartão (só para jornalista), com confirmação. Apaga a matéria e as imagens dela do Blob. Qualquer jornalista pode excluir qualquer matéria.

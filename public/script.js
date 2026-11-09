@@ -24,11 +24,15 @@
   const estado = {
     postagens: [],
     erroLista: false,
-    jornalista: null, // { nome, foto } — preenchido só depois que o SERVIDOR confirma o papel
+    jornalista: null, // { nome, bio, foto } — preenchido só depois que o SERVIDOR confirma o papel
     visitante: false, // jornalista olhando o site "como visitante"
     categoriaNova: 'noticias',
     leituraCategoria: 'noticias',
     imagem: null, // data URI da imagem de resumo já ajustada (16:9)
+    imagemFinal: null, // data URI da imagem do final da matéria (proporção original)
+    fotoNova: null, // foto de perfil escolhida e ainda não salva (data URI)
+    removerFoto: false,
+    excluindo: null, // postagem que está na janela de confirmação
     clerkPromessa: null,
     pronto: null, // promessa: postagens carregadas
     sessaoPronta: null, // promessa: tentativa de restaurar sessão terminou
@@ -77,27 +81,139 @@
     }
   }
 
-  // Monta o texto da matéria SEM innerHTML (evita injeção de HTML).
-  // Parágrafos separados por linha em branco; "## " = subtítulo; "> " = citação.
+  /* ---------- Leitor de Markdown (feito à mão, SEM biblioteca e SEM innerHTML) ----------
+     Tudo vira nós do DOM criados por createElement/textContent, então HTML escrito no
+     texto aparece como texto e nunca é executado.
+     Entende: # e ## (subtítulo), ### e #### (subtítulo menor), > citação, listas (- * + e 1.),
+     --- (linha), **negrito**, *itálico*, `código`, [texto](https://link) e ![alt](https://imagem).
+     Links aceitam http/https; imagens só https. */
+  const URL_LINK = /^https?:\/\/\S+$/i;
+  const URL_IMAGEM = /^https:\/\/\S+$/i;
+  // grupos: 1 escape | 2-3 imagem | 4-5 link | 6 **negrito** | 7 __negrito__ | 8 *itálico* | 9 _itálico_ | 10 `código`
+  const INLINE =
+    /\\([\\`*_[\]()!#>-])|!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)|\[([^\]]+)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)|\*\*([^\s*](?:[^*]*?[^\s*])?)\*\*|__([^\s_](?:[^_]*?[^\s_])?)__|\*([^\s*](?:[^*]*?[^\s*])?)\*|_([^\s_](?:[^_]*?[^\s_])?)_(?!\w)|`([^`]+)`/g;
+
+  function criarImagemTexto(alt, url) {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = alt;
+    img.loading = 'lazy';
+    img.referrerPolicy = 'no-referrer';
+    return img;
+  }
+
+  function inline(alvo, texto, simples = false) {
+    let fim = 0;
+    let m;
+    const re = new RegExp(INLINE.source, 'g'); // um objeto novo por chamada (a função se chama dentro dela mesma)
+    while ((m = re.exec(texto))) {
+      if (m.index > fim) alvo.append(document.createTextNode(texto.slice(fim, m.index)));
+      fim = m.index + m[0].length;
+
+      if (m[1] !== undefined) {
+        alvo.append(document.createTextNode(m[1]));
+      } else if (m[3] !== undefined) {
+        if (!simples && URL_IMAGEM.test(m[3])) alvo.append(criarImagemTexto(m[2], m[3]));
+        else alvo.append(document.createTextNode(m[0]));
+      } else if (m[5] !== undefined) {
+        if (!simples && URL_LINK.test(m[5])) {
+          const a = document.createElement('a');
+          a.href = m[5];
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer nofollow';
+          inline(a, m[4], true);
+          alvo.append(a);
+        } else {
+          alvo.append(document.createTextNode(m[0]));
+        }
+      } else if (m[6] !== undefined || m[7] !== undefined) {
+        const el = document.createElement('strong');
+        inline(el, m[6] ?? m[7], simples);
+        alvo.append(el);
+      } else if (m[8] !== undefined || m[9] !== undefined) {
+        // "_" no meio de uma palavra (snake_case) não vira itálico
+        if (m[9] !== undefined && m.index > 0 && /\w/.test(texto[m.index - 1])) {
+          alvo.append(document.createTextNode(m[0]));
+        } else {
+          const el = document.createElement('em');
+          inline(el, m[8] ?? m[9], simples);
+          alvo.append(el);
+        }
+      } else if (m[10] !== undefined) {
+        const el = document.createElement('code');
+        el.textContent = m[10];
+        alvo.append(el);
+      }
+    }
+    if (fim < texto.length) alvo.append(document.createTextNode(texto.slice(fim)));
+  }
+
+  const RE_TITULO = /^(#{1,4})\s+(.+?)\s*$/;
+  const RE_LINHA = /^\s*([-*_])(\s*\1){2,}\s*$/;
+  const RE_LISTA = /^\s*[-*+]\s+(.*)$/;
+  const RE_NUMERADA = /^\s*\d+[.)]\s+(.*)$/;
+  const RE_IMAGEM_SOZINHA = /^\s*!\[([^\]]*)\]\(\s*(https:\/\/[^)\s]+)(?:\s+"[^"]*")?\s*\)\s*$/;
+  const inicioDeBloco = (l) =>
+    RE_TITULO.test(l) || RE_LINHA.test(l) || l.startsWith('>') || RE_LISTA.test(l) || RE_NUMERADA.test(l) || RE_IMAGEM_SOZINHA.test(l);
+
   function montarTexto(alvo, texto) {
     alvo.replaceChildren();
-    for (const bloco of texto.split(/\n{2,}/)) {
-      const linhas = bloco.split('\n');
-      let el;
-      if (bloco.startsWith('## ')) {
-        el = document.createElement('h3');
-        el.textContent = bloco.slice(3).replace(/\n/g, ' ');
-      } else if (linhas.every((l) => l.startsWith('>'))) {
-        el = document.createElement('blockquote');
-        el.textContent = linhas.map((l) => l.replace(/^>\s?/, '')).join(' ');
-      } else {
-        el = document.createElement('p');
-        linhas.forEach((linha, i) => {
-          if (i) el.append(document.createElement('br'));
-          el.append(document.createTextNode(linha));
-        });
+    const linhas = String(texto).replace(/\r\n?/g, '\n').split('\n');
+    let i = 0;
+    while (i < linhas.length) {
+      const linha = linhas[i];
+      if (!linha.trim()) {
+        i++;
+        continue;
       }
-      alvo.append(el);
+      let m;
+
+      if ((m = RE_TITULO.exec(linha))) {
+        const el = document.createElement(m[1].length <= 2 ? 'h3' : 'h4');
+        inline(el, m[2]);
+        alvo.append(el);
+        i++;
+      } else if (RE_LINHA.test(linha)) {
+        alvo.append(document.createElement('hr'));
+        i++;
+      } else if (linha.startsWith('>')) {
+        const el = document.createElement('blockquote');
+        const partes = [];
+        while (i < linhas.length && linhas[i].startsWith('>')) partes.push(linhas[i++].replace(/^>\s?/, ''));
+        inline(el, partes.join(' '));
+        alvo.append(el);
+      } else if (RE_LISTA.test(linha) || RE_NUMERADA.test(linha)) {
+        const numerada = RE_NUMERADA.test(linha);
+        const regra = numerada ? RE_NUMERADA : RE_LISTA;
+        const lista = document.createElement(numerada ? 'ol' : 'ul');
+        while (i < linhas.length && (m = regra.exec(linhas[i]))) {
+          const li = document.createElement('li');
+          inline(li, m[1]);
+          lista.append(li);
+          i++;
+        }
+        alvo.append(lista);
+      } else if ((m = RE_IMAGEM_SOZINHA.exec(linha))) {
+        const fig = document.createElement('figure');
+        fig.append(criarImagemTexto(m[1], m[2]));
+        if (m[1].trim()) {
+          const legenda = document.createElement('figcaption');
+          legenda.textContent = m[1];
+          fig.append(legenda);
+        }
+        alvo.append(fig);
+        i++;
+      } else {
+        const el = document.createElement('p');
+        let primeira = true;
+        while (i < linhas.length && linhas[i].trim() && (primeira || !inicioDeBloco(linhas[i]))) {
+          if (!primeira) el.append(document.createElement('br'));
+          inline(el, linhas[i].trim());
+          primeira = false;
+          i++;
+        }
+        alvo.append(el);
+      }
     }
   }
 
@@ -156,7 +272,7 @@
   // Pergunta ao SERVIDOR se esta sessão é de um jornalista.
   async function verificarJornalista() {
     const dados = await api('/api/sessao', {}, true);
-    estado.jornalista = { nome: dados.nome, foto: dados.foto };
+    estado.jornalista = { nome: dados.nome, bio: dados.bio || '', foto: dados.foto || null };
     lembrar(true);
     atualizarBarra();
   }
@@ -188,6 +304,8 @@
 
   function criarCartao(modelo, p) {
     const no = modelo.content.cloneNode(true);
+    no.querySelector('article').dataset.id = p.id;
+    $('.btn-excluir', no).hidden = !modoEdicao(); // lixeira: só para jornalista
     campo(no, 'link').href = `#post-${p.id}`;
     definirImagem(campo(no, 'banner'), p.imagem, `Banner da matéria: ${p.titulo}`);
     campo(no, 'titulo').textContent = p.titulo;
@@ -241,10 +359,17 @@
     const foto = campo(leitura, 'foto-jornalista');
     if (p.autorFoto) definirImagem(foto, p.autorFoto, `Foto de ${p.autor}`);
     else foto.hidden = true;
+    const bio = campo(leitura, 'bio-jornalista');
+    bio.textContent = p.autorBio || '';
+    bio.hidden = !p.autorBio;
     const banner = campo(leitura, 'banner');
     banner.hidden = !p.imagem;
     definirImagem(banner, p.imagem, `Banner da matéria: ${p.titulo}`);
     montarTexto(campo(leitura, 'conteudo'), p.conteudo);
+    // imagem do final: sempre depois do texto, no tamanho dela
+    const figuraFinal = campo(leitura, 'figura-final');
+    figuraFinal.hidden = !p.imagemFinal;
+    definirImagem(campo(leitura, 'imagem-final'), p.imagemFinal, `Imagem do final da matéria: ${p.titulo}`);
 
     estado.leituraCategoria = p.categoria;
     leitura.setAttribute('aria-label', p.titulo);
@@ -282,8 +407,196 @@
   function atualizarBarra() {
     const barra = $('#barra-jornalista');
     barra.hidden = !estado.jornalista;
-    if (estado.jornalista) campo(barra, 'nome-jornalista').textContent = estado.jornalista.nome;
+    if (estado.jornalista) {
+      campo(barra, 'nome-jornalista').textContent = estado.jornalista.nome;
+      pintarAvatar(campo(barra, 'foto-perfil'), campo(barra, 'inicial'), estado.jornalista.foto, estado.jornalista.nome);
+    } else {
+      fecharMenuPerfil();
+    }
     $('#btn-visitante').textContent = estado.visitante ? 'Voltar ao modo jornalista' : 'Ver site público';
+  }
+
+  /* ---------- Perfil do jornalista (foto + nome + bio) ---------- */
+  const inicialDe = (nome) => ((nome || '').trim()[0] || '?').toUpperCase();
+
+  // Mostra a foto; sem foto, mostra a inicial do nome num círculo.
+  function pintarAvatar(img, inicial, foto, nome) {
+    inicial.textContent = inicialDe(nome);
+    if (foto) {
+      img.src = foto;
+      img.alt = '';
+      img.hidden = false;
+      inicial.hidden = true;
+    } else {
+      img.removeAttribute('src');
+      img.hidden = true;
+      inicial.hidden = false;
+    }
+  }
+
+  function atualizarPreviaPerfil() {
+    const menu = $('#menu-perfil');
+    const foto = estado.removerFoto ? null : estado.fotoNova || estado.jornalista?.foto || null;
+    pintarAvatar(campo(menu, 'foto-menu'), campo(menu, 'inicial-menu'), foto, $('#perfil-nome').value);
+    $('#btn-remover-foto').hidden = !foto;
+  }
+
+  function contarBio() {
+    const n = $('#perfil-bio').value.length;
+    $('#bio-contador').textContent = `${n}/280`;
+  }
+
+  function mensagemPerfil(texto, tipo = 'erro') {
+    const caixa = $('#perfil-msg');
+    caixa.textContent = texto;
+    caixa.className = `mensagem ${tipo}`;
+    caixa.hidden = !texto;
+  }
+
+  function abrirMenuPerfil() {
+    if (!estado.jornalista) return;
+    estado.fotoNova = null;
+    estado.removerFoto = false;
+    $('#perfil-nome').value = estado.jornalista.nome;
+    $('#perfil-bio').value = estado.jornalista.bio || '';
+    $('#arquivo-foto').value = '';
+    mensagemPerfil('');
+    contarBio();
+    atualizarPreviaPerfil();
+    $('#menu-perfil').hidden = false;
+    $('#btn-perfil').setAttribute('aria-expanded', 'true');
+    $('#perfil-nome').focus();
+  }
+
+  function fecharMenuPerfil(devolverFoco = false) {
+    const menu = $('#menu-perfil');
+    if (menu.hidden) return;
+    menu.hidden = true;
+    $('#btn-perfil').setAttribute('aria-expanded', 'false');
+    if (devolverFoco) $('#btn-perfil').focus();
+  }
+
+  async function salvarPerfil(evento) {
+    evento.preventDefault();
+    const nome = $('#perfil-nome').value.replace(/\s+/g, ' ').trim();
+    const bio = $('#perfil-bio').value.trim();
+    if (!nome) return mensagemPerfil('O nome de exibição não pode ficar vazio.');
+
+    const botao = $('#btn-perfil-salvar');
+    botao.disabled = true;
+    botao.textContent = 'Salvando…';
+    mensagemPerfil('');
+    try {
+      const dados = await api(
+        '/api/perfil',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nome,
+            bio,
+            foto: estado.fotoNova || undefined,
+            removerFoto: estado.removerFoto && !estado.fotoNova,
+          }),
+        },
+        true,
+      );
+      estado.jornalista = { nome: dados.perfil.nome, bio: dados.perfil.bio || '', foto: dados.perfil.foto || null };
+      atualizarBarra();
+      fecharMenuPerfil(true);
+      carregarPostagens(); // as matérias antigas passam a mostrar o novo nome/foto
+    } catch (erro) {
+      mensagemPerfil(erro.status === 401 ? 'Sua sessão expirou. Entre novamente.' : erro.message || 'Não foi possível salvar o perfil agora.');
+    } finally {
+      botao.disabled = false;
+      botao.textContent = 'Salvar';
+    }
+  }
+
+  function iniciarPerfil() {
+    $('#btn-perfil').addEventListener('click', () => ($('#menu-perfil').hidden ? abrirMenuPerfil() : fecharMenuPerfil(true)));
+    $('#btn-perfil-cancelar').addEventListener('click', () => fecharMenuPerfil(true));
+    $('#menu-perfil').addEventListener('submit', salvarPerfil);
+    $('#btn-foto-perfil').addEventListener('click', () => $('#arquivo-foto').click());
+    $('#perfil-nome').addEventListener('input', atualizarPreviaPerfil);
+    $('#perfil-bio').addEventListener('input', contarBio);
+    $('#btn-remover-foto').addEventListener('click', () => {
+      estado.fotoNova = null;
+      estado.removerFoto = true;
+      $('#arquivo-foto').value = '';
+      atualizarPreviaPerfil();
+    });
+    $('#arquivo-foto').addEventListener('change', async (evento) => {
+      const arquivo = evento.target.files[0];
+      if (!arquivo) return;
+      mensagemPerfil('');
+      try {
+        estado.fotoNova = await prepararFoto(arquivo);
+        estado.removerFoto = false;
+        atualizarPreviaPerfil();
+      } catch (erro) {
+        mensagemPerfil(erro.message || 'Não foi possível usar esta imagem.');
+      }
+    });
+    // fecha ao clicar fora ou apertar Esc (o que não foi salvo é descartado)
+    document.addEventListener('click', (evento) => {
+      if (!evento.target.closest('.perfil-caixa')) fecharMenuPerfil();
+    });
+    document.addEventListener('keydown', (evento) => {
+      if (evento.key === 'Escape') fecharMenuPerfil(true);
+    });
+  }
+
+  /* ---------- Excluir matéria (só jornalista; a API confere de novo no servidor) ---------- */
+  async function excluirPostagem() {
+    const p = estado.excluindo;
+    if (!p) return;
+    const botao = $('#excluir-confirmar');
+    const erro = $('#excluir-erro');
+    botao.disabled = true;
+    botao.textContent = 'Excluindo…';
+    erro.hidden = true;
+    try {
+      await api(`/api/postagens?id=${encodeURIComponent(p.id)}`, { method: 'DELETE' }, true);
+      estado.postagens = estado.postagens.filter((x) => x.id !== p.id);
+      renderizar();
+      $('#dialogo-excluir').close();
+    } catch (e) {
+      if (e.status === 404) {
+        estado.postagens = estado.postagens.filter((x) => x.id !== p.id);
+        renderizar();
+        $('#dialogo-excluir').close();
+      } else {
+        erro.textContent = e.status === 401 ? 'Sua sessão expirou. Entre novamente.' : e.message || 'Não foi possível excluir agora.';
+        erro.hidden = false;
+      }
+    } finally {
+      botao.disabled = false;
+      botao.textContent = 'Sim, excluir';
+    }
+  }
+
+  function iniciarExclusao() {
+    const janela = $('#dialogo-excluir');
+    document.addEventListener('click', (evento) => {
+      const botao = evento.target.closest('.btn-excluir');
+      if (!botao || !modoEdicao()) return;
+      const p = estado.postagens.find((x) => x.id === botao.closest('[data-id]')?.dataset.id);
+      if (!p) return;
+      estado.excluindo = p;
+      if (typeof janela.showModal !== 'function') {
+        // navegador muito antigo, sem <dialog>: usa a confirmação simples
+        if (window.confirm(`Excluir "${p.titulo}"? Esta ação não pode ser desfeita.`)) excluirPostagem();
+        return;
+      }
+      $('#excluir-texto').textContent = `"${p.titulo}" será apagada do portal, junto com as imagens. Esta ação não pode ser desfeita.`;
+      $('#excluir-erro').hidden = true;
+      janela.showModal();
+    });
+    $('#excluir-confirmar').addEventListener('click', excluirPostagem);
+    janela.addEventListener('close', () => {
+      estado.excluindo = null;
+    });
   }
 
   function mostrarSite(hash) {
@@ -399,6 +712,7 @@
     estado.jornalista = null;
     estado.visitante = false;
     lembrar(false);
+    fecharMenuPerfil();
     atualizarBarra();
     renderizar();
     location.hash = '#mural';
@@ -426,25 +740,50 @@
     }
   }
 
-  // Recorta no formato 16:9 e reduz para 1280x720 (JPEG), para a imagem ficar leve.
-  async function prepararImagem(arquivo) {
+  // Reduz a imagem no navegador e devolve um JPEG em data URI que cabe no limite do servidor.
+  //  - cobrir: true  -> recorta no tamanho exato largura x altura (capa 16:9, foto de perfil quadrada)
+  //  - cobrir: false -> mantém a proporção original, só limitando o maior lado a maxLado
+  async function gerarJpeg(arquivo, { cobrir, largura, altura, maxLado, limite }) {
     if (!TIPOS_IMAGEM.includes(arquivo.type)) throw new Error('Use uma imagem JPG, PNG ou WebP.');
     if (arquivo.size > 15 * 1024 * 1024) throw new Error('A imagem original é grande demais (máximo de 15 MB).');
     const bitmap = await carregarBitmap(arquivo);
-    const L = 1280;
-    const A = 720;
-    const escala = Math.max(L / bitmap.width, A / bitmap.height);
+    const bw = bitmap.width;
+    const bh = bitmap.height;
+
+    let L = largura;
+    let A = altura;
+    let escala;
+    if (cobrir) {
+      escala = Math.max(L / bw, A / bh);
+    } else {
+      escala = Math.min(1, maxLado / Math.max(bw, bh));
+      L = Math.max(1, Math.round(bw * escala));
+      A = Math.max(1, Math.round(bh * escala));
+    }
     const canvas = document.createElement('canvas');
     canvas.width = L;
     canvas.height = A;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#ffffff'; // PNG com fundo transparente fica sobre branco
     ctx.fillRect(0, 0, L, A);
-    ctx.drawImage(bitmap, (L - bitmap.width * escala) / 2, (A - bitmap.height * escala) / 2, bitmap.width * escala, bitmap.height * escala);
-    let dados = canvas.toDataURL('image/jpeg', 0.85);
-    if (dados.length > 2_800_000) dados = canvas.toDataURL('image/jpeg', 0.65);
-    return dados;
+    ctx.drawImage(bitmap, (L - bw * escala) / 2, (A - bh * escala) / 2, bw * escala, bh * escala);
+
+    for (const qualidade of [0.85, 0.72, 0.58, 0.45]) {
+      const dados = canvas.toDataURL('image/jpeg', qualidade);
+      if (dados.length <= limite) return dados;
+    }
+    throw new Error('Esta imagem ficou pesada demais mesmo depois de reduzida. Tente uma imagem menor.');
   }
+
+  // Imagem de resumo (capa): recortada em 16:9, 1280x720.
+  const prepararImagem = (arquivo) =>
+    gerarJpeg(arquivo, { cobrir: true, largura: 1280, altura: 720, limite: 1_900_000 });
+  // Imagem do final da matéria: sem formato fixo (só limita o maior lado a 1600 px).
+  const prepararImagemFinal = (arquivo) =>
+    gerarJpeg(arquivo, { cobrir: false, maxLado: 1600, limite: 1_900_000 });
+  // Foto de perfil: quadrada 256x256 (aparece redonda).
+  const prepararFoto = (arquivo) =>
+    gerarJpeg(arquivo, { cobrir: true, largura: 256, altura: 256, limite: 550_000 });
 
   function abrirEditor() {
     const tela = $('#tela-editor');
@@ -453,6 +792,7 @@
     const form = $('form', tela);
     form.categoria.value = estado.categoriaNova in CATEGORIAS ? estado.categoriaNova : 'noticias';
     estado.imagem = null;
+    estado.imagemFinal = null;
 
     const previa = campo(form, 'previa');
     const imgPrevia = $('img', previa);
@@ -491,6 +831,60 @@
       }
     });
     remover.addEventListener('click', limparImagem);
+
+    // Imagem do FINAL da matéria (tamanho livre)
+    const caixaFinal = campo(form, 'previa-final');
+    const imgFinal = $('img', caixaFinal);
+    const removerFinal = $('[data-acao="remover-final"]', form);
+    const limparFinal = () => {
+      estado.imagemFinal = null;
+      form.imagemFinal.value = '';
+      imgFinal.hidden = true;
+      imgFinal.removeAttribute('src');
+      caixaFinal.hidden = true;
+      removerFinal.hidden = true;
+    };
+    form.imagemFinal.addEventListener('change', async () => {
+      const arquivo = form.imagemFinal.files[0];
+      if (!arquivo) return;
+      aviso('');
+      try {
+        estado.imagemFinal = await prepararImagemFinal(arquivo);
+        imgFinal.src = estado.imagemFinal;
+        imgFinal.hidden = false;
+        caixaFinal.hidden = false;
+        removerFinal.hidden = false;
+      } catch (erro) {
+        limparFinal();
+        aviso(erro.message || 'Não foi possível usar esta imagem.');
+      }
+    });
+    removerFinal.addEventListener('click', limparFinal);
+
+    // "Anexar arquivo .md": o texto do arquivo entra no campo de conteúdo, exatamente como está.
+    // Se o arquivo começar com "# Título" e o título ainda estiver vazio, essa linha vira o título.
+    form.arquivoMd.addEventListener('change', async () => {
+      const arquivo = form.arquivoMd.files[0];
+      form.arquivoMd.value = '';
+      if (!arquivo) return;
+      if (!/\.(md|markdown|txt)$/i.test(arquivo.name)) return aviso('Escolha um arquivo com final .md');
+      if (arquivo.size > 300 * 1024) return aviso('O arquivo é grande demais (máximo de 300 KB).');
+      try {
+        let texto = (await arquivo.text()).replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+        const m = /^\s*#\s+(.+?)[ \t]*(?:\n|$)/.exec(texto);
+        if (m && !form.titulo.value.trim()) {
+          form.titulo.value = m[1].slice(0, 140);
+          texto = texto.slice(m[0].length);
+        }
+        texto = texto.trim();
+        if (texto.length > 60000) return aviso('O texto do arquivo passa de 60.000 caracteres.');
+        form.conteudo.value = texto;
+        aviso(`Arquivo "${arquivo.name}" carregado. Revise o texto e clique em Publicar.`, 'ok');
+      } catch {
+        aviso('Não foi possível ler este arquivo.');
+      }
+    });
+
     $('[data-acao="cancelar"]', form).addEventListener('click', () => {
       location.hash = `#${estado.categoriaNova in CATEGORIAS ? estado.categoriaNova : 'noticias'}`;
     });
@@ -514,7 +908,13 @@
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ titulo, conteudo, categoria, imagem: estado.imagem || undefined }),
+            body: JSON.stringify({
+              titulo,
+              conteudo,
+              categoria,
+              imagem: estado.imagem || undefined,
+              imagemFinal: estado.imagemFinal || undefined,
+            }),
           },
           true,
         );
@@ -539,6 +939,8 @@
   function iniciar() {
     $('#form-login').addEventListener('submit', entrar);
     $('#btn-sair').addEventListener('click', sair);
+    iniciarPerfil();
+    iniciarExclusao();
     $('#btn-visitante').addEventListener('click', () => {
       estado.visitante = !estado.visitante;
       atualizarBarra();
