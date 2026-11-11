@@ -94,7 +94,7 @@ O item "Login" existe no menu, mas fica escondido por CSS. A proteção de verda
 
 - **O que eu não pude testar**: Clerk, Neon e Blob reais. Testei o código com versões simuladas deles. A parte do Clerk no navegador usa `clerk.client.signIn.create`, `setActive` e `session.getToken` do `clerk-js@6`: se aparecer erro nessa etapa, mande a mensagem do console (sem chaves).
 - **GitHub Pages**: não executa API nem banco, então login e publicação **não funcionam lá**. O site em si abre, mas sem postagens. O caminho é a Vercel.
-- **Mural de avisos**: continua como antes (sem publicação). Esta entrega cobre as postagens das 6 categorias.
+- **Mural de avisos**: veja a seção 11.
 - Limite de 4,5 MB por requisição na Vercel: a imagem é reduzida no navegador para 1280×720 (JPEG) antes de enviar.
 
 ## 10. Área do jornalista (recursos)
@@ -104,3 +104,11 @@ O item "Login" existe no menu, mas fica escondido por CSS. A proteção de verda
 - **Markdown aceito**: `#`/`##` subtítulo, `###` subtítulo menor, `>` citação, listas (`-` e `1.`), `---`, `**negrito**`, `*itálico*`, `` `código` ``, `[texto](https://link)`, `![descrição](https://imagem)`. HTML escrito no texto aparece como texto (nunca é executado).
 - **Imagem do final**: opcional, sem formato fixo (o maior lado é limitado a 1600 px), aparece sempre depois do texto.
 - **Excluir**: lixeira no canto superior esquerdo de cada cartão (só para jornalista), com confirmação. Apaga a matéria e as imagens dela do Blob. Qualquer jornalista pode excluir qualquer matéria.
+
+## 11. Mural de Avisos (conta da diretoria)
+
+- **Quem publica**: só quem tem `{ "role": "diretoria" }` no *Public metadata* do usuário no Clerk. Jornalista não publica aviso e diretoria não publica matéria (o servidor confere o papel em cada rota). Os dois papéis podem editar o próprio perfil (nome e foto).
+- **Como é**: cartão simples no estilo de mensagem, sem título: foto/nome de quem postou em cima, texto puro (emojis e quebras de linha valem; HTML aparece como texto), imagem opcional sempre no fim, de ponta a ponta do cartão e na proporção original, e a hora no canto inferior direito. Não é clicável. Máximo de 2000 caracteres.
+- **Entrar**: `/#login` com a conta da diretoria; cai direto no Mural, onde o formulário "Novo aviso" aparece como primeiro cartão. A lixeira (com confirmação) aparece em cada aviso.
+- **Banco**: rode o `schema.sql` atualizado no SQL Editor do Neon (cria a tabela `avisos`). Sem isso o Mural fica vazio/erro 500, mas as matérias continuam funcionando.
+- Sem novas variáveis de ambiente e sem novos pacotes.

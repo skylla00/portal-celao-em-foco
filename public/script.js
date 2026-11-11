@@ -24,7 +24,11 @@
   const estado = {
     postagens: [],
     erroLista: false,
-    jornalista: null, // { nome, bio, foto } — preenchido só depois que o SERVIDOR confirma o papel
+    jornalista: null, // { papel, nome, bio, foto } da equipe logada — preenchido só depois que o SERVIDOR confirma o papel
+    avisos: [], // avisos do Mural
+    erroAvisos: false,
+    composer: null, // formulário de novo aviso (criado uma vez e reaproveitado, para não perder o texto digitado)
+    imagemAviso: null, // { dados, largura, altura } da imagem anexada ao novo aviso
     visitante: false, // jornalista olhando o site "como visitante"
     categoriaNova: 'noticias',
     leituraCategoria: 'noticias',
@@ -32,7 +36,7 @@
     imagemFinal: null, // data URI da imagem do final da matéria (proporção original)
     fotoNova: null, // foto de perfil escolhida e ainda não salva (data URI)
     removerFoto: false,
-    excluindo: null, // postagem que está na janela de confirmação
+    excluindo: null, // { tipo: 'postagem' | 'aviso', item } que está na janela de confirmação
     clerkPromessa: null,
     pronto: null, // promessa: postagens carregadas
     sessaoPronta: null, // promessa: tentativa de restaurar sessão terminou
@@ -41,6 +45,10 @@
   const $ = (seletor, raiz = document) => raiz.querySelector(seletor);
   const campo = (raiz, nome) => raiz.querySelector(`[data-campo="${nome}"]`);
   const modoEdicao = () => Boolean(estado.jornalista) && !estado.visitante;
+  // Cada papel enxerga só o que é dele (e a API confere de novo no servidor):
+  const ehJornalista = () => modoEdicao() && estado.jornalista.papel === 'jornalista'; // matérias
+  const ehDiretoria = () => modoEdicao() && estado.jornalista.papel === 'diretoria'; // avisos do Mural
+  const rotaInicial = () => (estado.jornalista?.papel === 'diretoria' ? '#mural' : '#noticias');
 
   /* ---------- utilidades ---------- */
   class ErroApi extends Error {
@@ -68,6 +76,29 @@
 
   const formatarData = (iso) =>
     new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  // Hora do aviso, como no WhatsApp: "14:32", "ontem 14:32" ou "09/11 14:32" (com o ano, se for de outro ano)
+  function formatarHoraAviso(iso) {
+    const d = new Date(iso);
+    const agora = new Date();
+    const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === agora.toDateString()) return hora;
+    const ontem = new Date(agora);
+    ontem.setDate(agora.getDate() - 1);
+    if (d.toDateString() === ontem.toDateString()) return `ontem ${hora}`;
+    const opcoes = { day: '2-digit', month: '2-digit' };
+    if (d.getFullYear() !== agora.getFullYear()) opcoes.year = 'numeric';
+    return `${d.toLocaleDateString('pt-BR', opcoes)} ${hora}`;
+  }
+
+  function dimensoesDaImagem(dataUri) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ largura: img.naturalWidth, altura: img.naturalHeight });
+      img.onerror = () => reject(new Error('Não foi possível usar esta imagem.'));
+      img.src = dataUri;
+    });
+  }
 
   function definirImagem(img, url, alt) {
     if (!img) return;
@@ -272,7 +303,7 @@
   // Pergunta ao SERVIDOR se esta sessão é de um jornalista.
   async function verificarJornalista() {
     const dados = await api('/api/sessao', {}, true);
-    estado.jornalista = { nome: dados.nome, bio: dados.bio || '', foto: dados.foto || null };
+    estado.jornalista = { papel: dados.papel, nome: dados.nome, bio: dados.bio || '', foto: dados.foto || null };
     lembrar(true);
     atualizarBarra();
   }
@@ -305,7 +336,7 @@
   function criarCartao(modelo, p) {
     const no = modelo.content.cloneNode(true);
     no.querySelector('article').dataset.id = p.id;
-    $('.btn-excluir', no).hidden = !modoEdicao(); // lixeira: só para jornalista
+    $('.btn-excluir', no).hidden = !ehJornalista(); // lixeira: só para jornalista
     campo(no, 'link').href = `#post-${p.id}`;
     definirImagem(campo(no, 'banner'), p.imagem, `Banner da matéria: ${p.titulo}`);
     campo(no, 'titulo').textContent = p.titulo;
@@ -318,7 +349,155 @@
     return no;
   }
 
+  /* ---------- Avisos do Mural ---------- */
+  async function carregarAvisos() {
+    try {
+      const dados = await api('/api/avisos');
+      estado.avisos = Array.isArray(dados.avisos) ? dados.avisos : [];
+      estado.erroAvisos = false;
+    } catch {
+      estado.erroAvisos = true;
+    }
+    renderizar();
+  }
+
+  function criarAviso(modelo, a) {
+    const no = modelo.content.cloneNode(true);
+    const artigo = no.querySelector('article');
+    artigo.dataset.id = a.id;
+    $('.btn-excluir', no).hidden = !ehDiretoria();
+    campo(no, 'autor').textContent = a.autor;
+    const foto = campo(no, 'foto');
+    const inicial = campo(no, 'inicial');
+    if (a.autorFoto) {
+      definirImagem(foto, a.autorFoto, `Foto de ${a.autor}`);
+    } else {
+      foto.hidden = true;
+      inicial.textContent = ((a.autor || '').trim()[0] || '?').toUpperCase();
+      inicial.hidden = false;
+    }
+    campo(no, 'texto').textContent = a.texto; // texto puro: nunca interpretado como HTML
+    const imagem = campo(no, 'imagem');
+    if (a.imagem) {
+      if (a.imagemLargura && a.imagemAltura) {
+        imagem.width = a.imagemLargura; // reserva o espaço (sem "pulo" quando a imagem carrega)
+        imagem.height = a.imagemAltura;
+      }
+      definirImagem(imagem, a.imagem, 'Imagem do aviso');
+    }
+    const hora = campo(no, 'hora');
+    hora.textContent = formatarHoraAviso(a.criadoEm);
+    hora.dateTime = a.criadoEm;
+    hora.title = new Date(a.criadoEm).toLocaleString('pt-BR');
+    return no;
+  }
+
+  // Formulário de novo aviso (conta "diretoria"): criado uma vez e reaproveitado
+  function obterComposer() {
+    if (estado.composer) return estado.composer;
+    const form = $('#modelo-novo-aviso').content.firstElementChild.cloneNode(true);
+    const aviso = (texto, tipo = 'erro') => {
+      const caixa = campo(form, 'mensagem');
+      caixa.textContent = texto;
+      caixa.className = `mensagem ${tipo}`;
+      caixa.hidden = !texto;
+    };
+    const previa = campo(form, 'previa');
+    const imgPrevia = $('img', previa);
+    const remover = $('[data-acao="remover-imagem"]', form);
+    const limparImagem = () => {
+      estado.imagemAviso = null;
+      form.imagem.value = '';
+      imgPrevia.removeAttribute('src');
+      previa.hidden = true;
+      remover.hidden = true;
+    };
+
+    form.imagem.addEventListener('change', async () => {
+      const arquivo = form.imagem.files[0];
+      if (!arquivo) return;
+      aviso('');
+      try {
+        const dados = await prepararImagemFinal(arquivo); // sem formato fixo: mantém a proporção
+        const { largura, altura } = await dimensoesDaImagem(dados);
+        estado.imagemAviso = { dados, largura, altura };
+        imgPrevia.src = dados;
+        previa.hidden = false;
+        remover.hidden = false;
+      } catch (erro) {
+        limparImagem();
+        aviso(erro.message || 'Não foi possível usar esta imagem.');
+      }
+    });
+    remover.addEventListener('click', limparImagem);
+
+    form.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      const texto = form.texto.value.trim();
+      if (!texto && !estado.imagemAviso) return aviso('Escreva o aviso ou anexe uma imagem.');
+      const botao = campo(form, 'publicar');
+      botao.disabled = true;
+      botao.textContent = 'Publicando…';
+      aviso('');
+      try {
+        const img = estado.imagemAviso;
+        const dados = await api(
+          '/api/avisos',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              texto,
+              imagem: img?.dados,
+              largura: img?.largura,
+              altura: img?.altura,
+            }),
+          },
+          true,
+        );
+        estado.avisos.unshift(dados.aviso);
+        form.texto.value = '';
+        limparImagem();
+        renderizar();
+      } catch (erro) {
+        aviso(
+          erro.status === 401
+            ? 'Sua sessão expirou. Entre de novo pelo endereço de login (em outra aba) e publique outra vez; o texto foi mantido.'
+            : erro.message || 'Não foi possível publicar agora.',
+        );
+      } finally {
+        botao.disabled = false;
+        botao.textContent = 'Publicar';
+      }
+    });
+
+    form.limpar = () => {
+      form.reset();
+      limparImagem();
+      aviso('');
+    };
+    estado.composer = form;
+    return form;
+  }
+
+  function renderizarAvisos() {
+    const lista = $('#lista-mural');
+    lista.replaceChildren();
+    if (ehDiretoria()) lista.append(obterComposer());
+    const modelo = $('#modelo-aviso');
+    for (const a of estado.avisos) lista.append(criarAviso(modelo, a));
+
+    const vazio = lista.nextElementSibling;
+    if (vazio?.classList.contains('vazio')) {
+      vazio.dataset.padrao ??= vazio.textContent;
+      vazio.textContent = estado.erroAvisos
+        ? 'Não foi possível carregar os avisos agora. Tente novamente mais tarde.'
+        : vazio.dataset.padrao;
+    }
+  }
+
   function renderizar() {
+    renderizarAvisos();
     const modelo = $('#modelo-cartao-postagem');
     const novo = $('#modelo-nova-postagem');
     for (const slug of Object.keys(CATEGORIAS)) {
@@ -326,7 +505,7 @@
       lista.replaceChildren();
 
       // Jornalista: o botão "Criar nova postagem" ocupa o lugar de "Nenhuma postagem ainda"
-      if (modoEdicao()) {
+      if (ehJornalista()) {
         const botao = novo.content.cloneNode(true);
         campo(botao, 'novo').dataset.categoria = slug;
         lista.append(botao);
@@ -451,6 +630,7 @@
   function atualizarBarra() {
     const barra = $('#barra-jornalista');
     barra.hidden = !estado.jornalista;
+    barra.setAttribute('aria-label', estado.jornalista?.papel === 'diretoria' ? 'Área da diretoria' : 'Área do jornalista');
     if (estado.jornalista) {
       campo(barra, 'nome-jornalista').textContent = estado.jornalista.nome;
       pintarAvatar(campo(barra, 'foto-perfil'), campo(barra, 'inicial'), estado.jornalista.foto, estado.jornalista.nome);
@@ -545,7 +725,7 @@
         },
         true,
       );
-      estado.jornalista = { nome: dados.perfil.nome, bio: dados.perfil.bio || '', foto: dados.perfil.foto || null };
+      estado.jornalista = { papel: estado.jornalista.papel, nome: dados.perfil.nome, bio: dados.perfil.bio || '', foto: dados.perfil.foto || null };
       atualizarBarra();
       fecharMenuPerfil(true);
       carregarPostagens(); // as matérias antigas passam a mostrar o novo nome/foto
@@ -591,24 +771,29 @@
     });
   }
 
-  /* ---------- Excluir matéria (só jornalista; a API confere de novo no servidor) ---------- */
-  async function excluirPostagem() {
-    const p = estado.excluindo;
-    if (!p) return;
+  /* ---------- Excluir matéria (jornalista) ou aviso (diretoria); a API confere de novo no servidor ---------- */
+  async function excluirItem() {
+    const alvo = estado.excluindo;
+    if (!alvo) return;
+    const { tipo, item: p } = alvo;
+    const rota = tipo === 'aviso' ? '/api/avisos' : '/api/postagens';
+    const remover = () => {
+      if (tipo === 'aviso') estado.avisos = estado.avisos.filter((x) => x.id !== p.id);
+      else estado.postagens = estado.postagens.filter((x) => x.id !== p.id);
+      renderizar();
+    };
     const botao = $('#excluir-confirmar');
     const erro = $('#excluir-erro');
     botao.disabled = true;
     botao.textContent = 'Excluindo…';
     erro.hidden = true;
     try {
-      await api(`/api/postagens?id=${encodeURIComponent(p.id)}`, { method: 'DELETE' }, true);
-      estado.postagens = estado.postagens.filter((x) => x.id !== p.id);
-      renderizar();
+      await api(`${rota}?id=${encodeURIComponent(p.id)}`, { method: 'DELETE' }, true);
+      remover();
       $('#dialogo-excluir').close();
     } catch (e) {
       if (e.status === 404) {
-        estado.postagens = estado.postagens.filter((x) => x.id !== p.id);
-        renderizar();
+        remover();
         $('#dialogo-excluir').close();
       } else {
         erro.textContent = e.status === 401 ? 'Sua sessão expirou. Entre novamente.' : e.message || 'Não foi possível excluir agora.';
@@ -624,20 +809,33 @@
     const janela = $('#dialogo-excluir');
     document.addEventListener('click', (evento) => {
       const botao = evento.target.closest('.btn-excluir');
-      if (!botao || !modoEdicao()) return;
-      const p = estado.postagens.find((x) => x.id === botao.closest('[data-id]')?.dataset.id);
-      if (!p) return;
-      estado.excluindo = p;
+      if (!botao) return;
+      const id = botao.closest('[data-id]')?.dataset.id;
+      let alvo = null;
+      if (botao.closest('.aviso')) {
+        const a = ehDiretoria() && estado.avisos.find((x) => x.id === id);
+        if (a) alvo = { tipo: 'aviso', item: a };
+      } else {
+        const p = ehJornalista() && estado.postagens.find((x) => x.id === id);
+        if (p) alvo = { tipo: 'postagem', item: p };
+      }
+      if (!alvo) return;
+      estado.excluindo = alvo;
+      const aviso = alvo.tipo === 'aviso';
+      const resumo = aviso ? alvo.item.texto.slice(0, 80) || 'o aviso com imagem' : `"${alvo.item.titulo}"`;
       if (typeof janela.showModal !== 'function') {
         // navegador muito antigo, sem <dialog>: usa a confirmação simples
-        if (window.confirm(`Excluir "${p.titulo}"? Esta ação não pode ser desfeita.`)) excluirPostagem();
+        if (window.confirm(`Excluir ${resumo}? Esta ação não pode ser desfeita.`)) excluirItem();
         return;
       }
-      $('#excluir-texto').textContent = `"${p.titulo}" será apagada do portal, junto com as imagens. Esta ação não pode ser desfeita.`;
+      $('#excluir-titulo').textContent = aviso ? 'Excluir este aviso?' : 'Excluir esta matéria?';
+      $('#excluir-texto').textContent = aviso
+        ? `${resumo}${alvo.item.texto.length > 80 ? '…' : ''} será apagado do Mural, junto com a imagem. Esta ação não pode ser desfeita.`
+        : `${resumo} será apagada do portal, junto com as imagens. Esta ação não pode ser desfeita.`;
       $('#excluir-erro').hidden = true;
       janela.showModal();
     });
-    $('#excluir-confirmar').addEventListener('click', excluirPostagem);
+    $('#excluir-confirmar').addEventListener('click', excluirItem);
     janela.addEventListener('close', () => {
       estado.excluindo = null;
     });
@@ -661,7 +859,7 @@
 
   async function mostrarLogin() {
     await estado.sessaoPronta;
-    if (estado.jornalista) return location.replace('#noticias');
+    if (estado.jornalista) return location.replace(rotaInicial());
     telaCheia('login');
     $('#login-erro').hidden = true;
     $('#login-usuario').focus();
@@ -669,12 +867,13 @@
 
   async function entrarComoJornalista() {
     await estado.sessaoPronta;
-    location.replace(estado.jornalista ? '#noticias' : '#login');
+    location.replace(estado.jornalista ? rotaInicial() : '#login');
   }
 
   async function mostrarEditor() {
     await estado.sessaoPronta;
     if (!estado.jornalista) return location.replace('#login');
+    if (estado.jornalista.papel !== 'jornalista') return location.replace(rotaInicial()); // o editor de matérias é só do jornalista
     abrirEditor();
   }
 
@@ -702,7 +901,7 @@
     if (erro?.status === 429 || codigo === 'too_many_requests') {
       return 'Muitas tentativas. Aguarde um pouco e tente de novo.';
     }
-    if (erro instanceof ErroApi && erro.status === 403) return 'Esta conta não tem permissão de jornalista.';
+    if (erro instanceof ErroApi && erro.status === 403) return 'Esta conta não tem permissão de acesso.';
     if (erro instanceof ErroApi && erro.status === 401) return 'Não foi possível confirmar a sessão. Tente entrar de novo.';
     if (erro instanceof ErroApi) return erro.message;
     return 'Não foi possível iniciar o login agora. Verifique a conexão e tente novamente.';
@@ -727,13 +926,13 @@
         }
         await clerk.setActive({ session: tentativa.createdSessionId });
       }
-      await verificarJornalista(); // o servidor confirma o papel de jornalista
+      await verificarJornalista(); // o servidor confirma o papel (jornalista ou diretoria)
       $('#login-senha').value = '';
       estado.visitante = false;
       renderizar();
-      location.hash = '#noticias';
+      location.hash = rotaInicial();
     } catch (erro) {
-      // Entrou no Clerk, mas não é jornalista: encerra a sessão
+      // Entrou no Clerk, mas a conta não tem papel nenhum (nem jornalista nem diretoria): encerra a sessão
       if (erro instanceof ErroApi && erro.status === 403) {
         try {
           await window.Clerk?.signOut();
@@ -756,6 +955,7 @@
     }
     estado.jornalista = null;
     estado.visitante = false;
+    estado.composer?.limpar?.();
     lembrar(false);
     fecharMenuPerfil();
     atualizarBarra();
@@ -1005,6 +1205,7 @@
     observarTopicos();
     marcarAtivo('mural');
     estado.pronto = carregarPostagens();
+    carregarAvisos();
     estado.sessaoPronta = restaurarSessao();
     rotear();
   }

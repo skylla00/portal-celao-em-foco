@@ -30,3 +30,17 @@ CREATE TABLE IF NOT EXISTS perfis (
   foto           TEXT,               -- URL no Vercel Blob
   atualizado_em  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Avisos do Mural (só a conta com papel "diretoria" publica): texto puro com emojis e/ou uma imagem.
+CREATE TABLE IF NOT EXISTS avisos (
+  id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  texto           TEXT NOT NULL DEFAULT '',
+  imagem          TEXT,              -- URL no Vercel Blob
+  imagem_largura  INTEGER,           -- só para reservar o espaço da imagem na tela
+  imagem_altura   INTEGER,
+  autor           TEXT NOT NULL,     -- nome gravado no dia da publicação (reserva)
+  autor_id        TEXT NOT NULL,     -- id do usuário no Clerk (interno, não é exibido)
+  autor_foto      TEXT,
+  criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS avisos_criado_em_idx ON avisos (criado_em DESC);

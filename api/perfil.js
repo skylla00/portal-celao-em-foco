@@ -1,5 +1,5 @@
 import { del, put } from '@vercel/blob';
-import { exigirJornalista } from '../lib/auth.js';
+import { exigirEquipe } from '../lib/auth.js';
 import { conectar } from '../lib/db.js';
 import { lerJson, metodoNaoPermitido, responder } from '../lib/http.js';
 import { obterPerfil } from '../lib/perfil.js';
@@ -7,12 +7,12 @@ import { validarPerfil } from '../lib/validar.js';
 
 const ehBlob = (url) => typeof url === 'string' && /^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\//i.test(url);
 
-// PUT /api/perfil — só jornalista autenticado, e só o PRÓPRIO perfil
+// PUT /api/perfil — só equipe autenticada (jornalista ou diretoria), e só o PRÓPRIO perfil
 // (o id vem da sessão do Clerk no servidor, nunca do corpo da requisição).
 export default async function handler(req, res) {
   if (req.method !== 'PUT') return metodoNaoPermitido(res, ['PUT']);
 
-  const auth = await exigirJornalista(req);
+  const auth = await exigirEquipe(req);
   if (!auth.ok) return responder(res, auth.status, { erro: auth.erro });
 
   const corpo = lerJson(req);

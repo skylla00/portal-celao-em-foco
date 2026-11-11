@@ -315,16 +315,16 @@ header h1 span { color: var(--ouro); }
   grid-template-columns: 1fr; /* celular: uma coluna */
 }
 
-/* Mural: uma coluna só, avisos empilhados */
-#mural .lista { max-width: 720px; }
-#mural > h2 { max-width: 720px; }
+/* Mural: mesma grade e mesma largura dos cartões das outras abas; a altura de cada aviso
+   acompanha o tamanho da mensagem (por isso alinhados ao topo, sem esticar). */
+#mural .lista { align-items: start; }
 
 /* Cartões entram suavemente (também os que o JS inserir depois) */
 @keyframes subir {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: none; }
 }
-.lista > .cartao { animation: subir 0.45s ease backwards; }
+.lista > .cartao, .lista > .aviso { animation: subir 0.45s ease backwards; }
 .lista > .cartao:nth-child(2) { animation-delay: 0.05s; }
 .lista > .cartao:nth-child(3) { animation-delay: 0.1s; }
 .lista > .cartao:nth-child(4) { animation-delay: 0.15s; }
@@ -577,6 +577,82 @@ header h1 span { color: var(--ouro); }
 .credito-jornalista .credito-bio { display: block; margin-top: 0.15rem; font-style: italic; overflow-wrap: anywhere; }
 .credito-jornalista .credito-bio[hidden] { display: none; }
 
+/* ---------- AVISOS DO MURAL (estilo mensagem de WhatsApp, no visual dos cartões do site) ---------- */
+.aviso { min-width: 0; }
+.aviso-perfil { margin: 0 0 0.6rem; }
+.aviso-perfil figcaption { min-width: 0; overflow-wrap: anywhere; }
+.aviso-perfil .btn-excluir { position: static; margin-left: auto; flex: none; }
+.avatar-credito {
+  width: 56px;
+  height: 56px;
+  border: 3px solid var(--superficie);
+  box-shadow: 0 0 0 2px var(--azul);
+  font-size: 1.4rem;
+}
+.avatar-credito[hidden] { display: none; }
+
+.cartao-mensagem {
+  position: relative;
+  padding: 0;
+  overflow: hidden; /* a imagem acompanha os cantos arredondados */
+}
+/* fonte comum do sistema (a mesma do teclado e das mensagens), não a fonte de título do site */
+.aviso-texto,
+.aviso-compor textarea {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+}
+.aviso-texto {
+  margin: 0;
+  padding: 0.8rem 1rem 0.3rem;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--texto);
+  white-space: pre-wrap; /* mantém as quebras de linha do jeito que foram digitadas */
+  overflow-wrap: anywhere;
+}
+.aviso-texto:empty { display: none; }
+.aviso-imagem {
+  display: block;
+  width: 100%; /* de uma borda a outra do cartão */
+  height: auto; /* a altura segue a proporção da imagem (retangular, quadrada, vertical) */
+  margin-top: 0.55rem;
+  background: var(--papel);
+}
+.aviso-texto:empty + .aviso-imagem { margin-top: 0; }
+.aviso-hora {
+  display: block;
+  padding: 0 0.85rem 0.5rem;
+  text-align: right;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--suave);
+}
+/* com imagem, a hora fica sobre ela, no canto inferior direito */
+.aviso-imagem:not([hidden]) ~ .aviso-hora {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.55rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+}
+
+/* formulário da diretoria */
+.aviso-compor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 2px dashed var(--destaque);
+}
+.aviso-compor textarea { min-height: 7rem; }
+.aviso-previa { overflow: hidden; border-radius: 12px; border: 1px solid var(--cor-borda); }
+.aviso-previa[hidden] { display: none; }
+.aviso-previa img { display: block; width: 100%; height: auto; }
+.aviso-compor-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.aviso-compor-acoes .btn-principal { margin-left: auto; }
+
 /* ---------- 11. MENSAGEM DE LISTA VAZIA ---------- */
 .vazio {
   max-width: 720px;
@@ -641,7 +717,6 @@ footer { margin-top: auto; } /* em páginas curtas, o rodapé fica no fim da tel
 
   /* 2 ou mais colunas, conforme a largura disponível */
   .lista { gap: 1.25rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-  #mural .lista { grid-template-columns: 1fr; }
 
   .cartao-aviso { padding: 1.35rem 1.5rem 1.15rem 1.6rem; }
   .cartao-aviso h3 { font-size: 1.4rem; }
@@ -700,7 +775,7 @@ footer { margin-top: auto; } /* em páginas curtas, o rodapé fica no fim da tel
 /* Respeita quem prefere menos movimento */
 @media (prefers-reduced-motion: reduce) {
   #painel-topicos { scroll-behavior: auto; }
-  .lista > .cartao { animation: none; }
+  .lista > .cartao, .lista > .aviso { animation: none; }
   .cartao-postagem, .banner-caixa .banner, .logo, #btn-voltar { transition: none; }
   .cartao-postagem:hover, .cartao-postagem:hover .banner { transform: none; }
 }
