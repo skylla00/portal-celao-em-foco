@@ -17,7 +17,6 @@
     entrevistas: 'Entrevistas',
     'resenha-critica': 'Resenha Crítica',
     opiniao: 'Opinião',
-    artes: 'Artes',
   };
   const DICA = 'celao-jornalista'; // só uma dica de interface ("tentar restaurar a sessão"). NÃO autoriza nada.
 
@@ -29,6 +28,10 @@
     erroAvisos: false,
     composer: null, // formulário de novo aviso (criado uma vez e reaproveitado, para não perder o texto digitado)
     imagemAviso: null, // { dados, largura, altura } da imagem anexada ao novo aviso
+    artes: [],
+    erroArtes: false,
+    imagemArte: null,
+    enviandoArte: false,
     visitante: false, // jornalista olhando o site "como visitante"
     categoriaNova: 'noticias',
     leituraCategoria: 'noticias',
@@ -36,7 +39,7 @@
     imagemFinal: null, // data URI da imagem do final da matéria (proporção original)
     fotoNova: null, // foto de perfil escolhida e ainda não salva (data URI)
     removerFoto: false,
-    excluindo: null, // { tipo: 'postagem' | 'aviso', item } que está na janela de confirmação
+    excluindo: null, // { tipo: 'postagem' | 'aviso' | 'arte', item } que está na janela de confirmação
     clerkPromessa: null,
     pronto: null, // promessa: postagens carregadas
     sessaoPronta: null, // promessa: tentativa de restaurar sessão terminou
@@ -361,6 +364,147 @@
     renderizar();
   }
 
+  async function carregarArtes() {
+    try {
+      const dados = await api('/api/artes');
+      estado.artes = Array.isArray(dados.artes) ? dados.artes : [];
+      estado.erroArtes = false;
+    } catch {
+      estado.erroArtes = true;
+    }
+    renderizar();
+  }
+
+  function criarArte(modelo, arte) {
+    const no = modelo.content.cloneNode(true);
+    const artigo = no.querySelector('article');
+    artigo.dataset.id = arte.id;
+    $('.btn-excluir', no).hidden = !ehJornalista();
+    const imagem = campo(no, 'imagem-arte');
+    if (arte.imagemLargura && arte.imagemAltura) {
+      imagem.width = arte.imagemLargura;
+      imagem.height = arte.imagemAltura;
+    }
+    definirImagem(imagem, arte.imagem, arte.legenda || `Arte publicada por ${arte.autor}`);
+    const legenda = campo(no, 'legenda-arte');
+    legenda.textContent = arte.legenda;
+    legenda.hidden = !arte.legenda;
+    campo(no, 'autor-arte').textContent = arte.autor;
+    const data = campo(no, 'data-arte');
+    data.textContent = formatarData(arte.criadoEm);
+    data.dateTime = arte.criadoEm;
+    return no;
+  }
+
+  function renderizarArtes() {
+    const lista = $('#lista-artes');
+    lista.replaceChildren();
+    $('#btn-enviar-arte').hidden = !ehJornalista();
+    const modelo = $('#modelo-arte');
+    for (const arte of estado.artes) lista.append(criarArte(modelo, arte));
+
+    const vazio = lista.nextElementSibling;
+    if (vazio?.classList.contains('vazio')) {
+      vazio.dataset.padrao ??= vazio.textContent;
+      vazio.textContent = estado.erroArtes
+        ? 'Não foi possível carregar as artes agora. Tente novamente mais tarde.'
+        : vazio.dataset.padrao;
+    }
+  }
+
+  function iniciarEnvioArte() {
+    const dialogo = $('#dialogo-arte');
+    const form = $('#form-arte');
+    const previa = $('.arte-previa', form);
+    const imgPrevia = $('img', previa);
+    const mensagem = campo(form, 'mensagem-arte');
+    const botaoPublicar = campo(form, 'publicar-arte');
+    const botaoCancelar = $('#btn-cancelar-arte');
+    const avisar = (texto, tipo = 'erro') => {
+      mensagem.textContent = texto;
+      mensagem.className = `mensagem ${tipo}`;
+      mensagem.hidden = !texto;
+    };
+    const limpar = () => {
+      estado.imagemArte = null;
+      form.reset();
+      imgPrevia.removeAttribute('src');
+      previa.hidden = true;
+      avisar('');
+    };
+
+    $('#btn-enviar-arte').addEventListener('click', () => {
+      if (!ehJornalista()) return;
+      dialogo.showModal();
+      form.imagem.focus();
+    });
+    botaoCancelar.addEventListener('click', () => dialogo.close());
+    dialogo.addEventListener('close', limpar);
+    dialogo.addEventListener('cancel', (evento) => {
+      if (estado.enviandoArte) evento.preventDefault();
+    });
+
+    form.imagem.addEventListener('change', async () => {
+      const arquivo = form.imagem.files[0];
+      if (!arquivo) return;
+      avisar('');
+      try {
+        const dados = await prepararImagemFinal(arquivo);
+        const dimensoes = await dimensoesDaImagem(dados);
+        estado.imagemArte = { dados, ...dimensoes };
+        imgPrevia.src = dados;
+        previa.hidden = false;
+      } catch (erro) {
+        estado.imagemArte = null;
+        form.imagem.value = '';
+        imgPrevia.removeAttribute('src');
+        previa.hidden = true;
+        avisar(erro.message || 'Não foi possível usar esta imagem.');
+      }
+    });
+
+    form.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      if (!estado.imagemArte) return avisar('Escolha a imagem da arte.');
+
+      estado.enviandoArte = true;
+      botaoPublicar.disabled = true;
+      botaoCancelar.disabled = true;
+      botaoPublicar.textContent = 'Publicando…';
+      avisar('');
+      try {
+        const dados = await api(
+          '/api/artes',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              legenda: form.legenda.value.trim(),
+              imagem: estado.imagemArte.dados,
+              largura: estado.imagemArte.largura,
+              altura: estado.imagemArte.altura,
+            }),
+          },
+          true,
+        );
+        estado.artes.unshift(dados.arte);
+        renderizar();
+        dialogo.close();
+      } catch (erro) {
+        avisar(
+          erro.status === 401
+            ? 'Sua sessão expirou. Entre novamente e tente publicar a arte.'
+            : erro.message || 'Não foi possível publicar a arte agora.',
+        );
+      } finally {
+        estado.enviandoArte = false;
+        botaoPublicar.disabled = false;
+        botaoCancelar.disabled = false;
+        botaoPublicar.textContent = 'Publicar arte';
+      }
+    });
+  }
+
   function criarAviso(modelo, a) {
     const no = modelo.content.cloneNode(true);
     const artigo = no.querySelector('article');
@@ -498,6 +642,7 @@
 
   function renderizar() {
     renderizarAvisos();
+    renderizarArtes();
     const modelo = $('#modelo-cartao-postagem');
     const novo = $('#modelo-nova-postagem');
     for (const slug of Object.keys(CATEGORIAS)) {
@@ -771,14 +916,15 @@
     });
   }
 
-  /* ---------- Excluir matéria (jornalista) ou aviso (diretoria); a API confere de novo no servidor ---------- */
+  /* ---------- Excluir matéria, arte ou aviso; a API confere a permissão no servidor ---------- */
   async function excluirItem() {
     const alvo = estado.excluindo;
     if (!alvo) return;
     const { tipo, item: p } = alvo;
-    const rota = tipo === 'aviso' ? '/api/avisos' : '/api/postagens';
+    const rota = tipo === 'aviso' ? '/api/avisos' : tipo === 'arte' ? '/api/artes' : '/api/postagens';
     const remover = () => {
       if (tipo === 'aviso') estado.avisos = estado.avisos.filter((x) => x.id !== p.id);
+      else if (tipo === 'arte') estado.artes = estado.artes.filter((x) => x.id !== p.id);
       else estado.postagens = estado.postagens.filter((x) => x.id !== p.id);
       renderizar();
     };
@@ -815,6 +961,9 @@
       if (botao.closest('.aviso')) {
         const a = ehDiretoria() && estado.avisos.find((x) => x.id === id);
         if (a) alvo = { tipo: 'aviso', item: a };
+      } else if (botao.closest('.cartao-arte')) {
+        const arte = ehJornalista() && estado.artes.find((x) => x.id === id);
+        if (arte) alvo = { tipo: 'arte', item: arte };
       } else {
         const p = ehJornalista() && estado.postagens.find((x) => x.id === id);
         if (p) alvo = { tipo: 'postagem', item: p };
@@ -822,16 +971,27 @@
       if (!alvo) return;
       estado.excluindo = alvo;
       const aviso = alvo.tipo === 'aviso';
-      const resumo = aviso ? alvo.item.texto.slice(0, 80) || 'o aviso com imagem' : `"${alvo.item.titulo}"`;
+      const arte = alvo.tipo === 'arte';
+      const resumo = aviso
+        ? alvo.item.texto.slice(0, 80) || 'o aviso com imagem'
+        : arte
+          ? alvo.item.legenda || 'esta arte'
+          : `"${alvo.item.titulo}"`;
       if (typeof janela.showModal !== 'function') {
         // navegador muito antigo, sem <dialog>: usa a confirmação simples
         if (window.confirm(`Excluir ${resumo}? Esta ação não pode ser desfeita.`)) excluirItem();
         return;
       }
-      $('#excluir-titulo').textContent = aviso ? 'Excluir este aviso?' : 'Excluir esta matéria?';
+      $('#excluir-titulo').textContent = aviso
+        ? 'Excluir este aviso?'
+        : arte
+          ? 'Excluir esta arte?'
+          : 'Excluir esta matéria?';
       $('#excluir-texto').textContent = aviso
         ? `${resumo}${alvo.item.texto.length > 80 ? '…' : ''} será apagado do Mural, junto com a imagem. Esta ação não pode ser desfeita.`
-        : `${resumo} será apagada do portal, junto com as imagens. Esta ação não pode ser desfeita.`;
+        : arte
+          ? `${resumo} será apagada da galeria, junto com a imagem. Esta ação não pode ser desfeita.`
+          : `${resumo} será apagada do portal, junto com as imagens. Esta ação não pode ser desfeita.`;
       $('#excluir-erro').hidden = true;
       janela.showModal();
     });
@@ -1186,6 +1346,7 @@
     $('#btn-sair').addEventListener('click', sair);
     iniciarPerfil();
     iniciarExclusao();
+    iniciarEnvioArte();
     $('#btn-visitante').addEventListener('click', () => {
       estado.visitante = !estado.visitante;
       atualizarBarra();
@@ -1206,6 +1367,7 @@
     marcarAtivo('mural');
     estado.pronto = carregarPostagens();
     carregarAvisos();
+    carregarArtes();
     estado.sessaoPronta = restaurarSessao();
     rotear();
   }

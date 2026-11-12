@@ -44,3 +44,27 @@ CREATE TABLE IF NOT EXISTS avisos (
   criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS avisos_criado_em_idx ON avisos (criado_em DESC);
+
+-- Artes da galeria: conteúdo independente das matérias e das categorias do jornal.
+CREATE TABLE IF NOT EXISTS artes (
+  id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  legenda          TEXT NOT NULL DEFAULT '',
+  imagem           TEXT NOT NULL,        -- URL da imagem no Vercel Blob
+  imagem_largura   INTEGER,
+  imagem_altura    INTEGER,
+  autor            TEXT NOT NULL,
+  autor_id         TEXT NOT NULL,
+  autor_foto       TEXT,
+  criado_em        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  postagem_legada_id BIGINT UNIQUE        -- impede duplicação da migração de antigas artes
+);
+CREATE INDEX IF NOT EXISTS artes_criado_em_idx ON artes (criado_em DESC);
+
+-- Importa para a galeria as artes que antes eram matérias na categoria "artes".
+-- A coluna única torna a migração segura para rodar novamente.
+INSERT INTO artes (legenda, imagem, autor, autor_id, autor_foto, criado_em, postagem_legada_id)
+SELECT titulo, COALESCE(imagem, imagem_final), autor, autor_id, autor_foto, criado_em, id
+FROM postagens
+WHERE categoria = 'artes'
+  AND COALESCE(imagem, imagem_final) IS NOT NULL
+ON CONFLICT (postagem_legada_id) DO NOTHING;
