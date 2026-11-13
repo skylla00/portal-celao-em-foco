@@ -446,7 +446,7 @@ header h1 span { color: var(--ouro); }
 #btn-enviar-arte { margin: 0 0 1rem; }
 #artes .lista { align-items: start; }
 .cartao-arte { position: relative; overflow: hidden; padding: 0; }
-.arte-imagem { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; background: var(--papel); }
+.arte-imagem { display: block; width: 100%; height: auto; background: var(--papel); }
 .arte-detalhes { padding: 0.85rem 1rem 1rem; }
 .arte-detalhes p { margin: 0 0 0.35rem; font-weight: 700; overflow-wrap: anywhere; }
 .arte-detalhes p:empty { display: none; }
@@ -1090,9 +1090,9 @@ body.modo-tela-cheia > .barra-jornalista { display: none !important; }
 .dialogo-arte { width: min(600px, calc(100vw - 2rem)); border-top-color: var(--turquesa); }
 .dialogo-arte .dialogo-corpo { gap: 1rem; }
 .dialogo-arte .campo { margin: 0; }
-.arte-previa { overflow: hidden; max-height: 50vh; border: 1px solid var(--cor-borda); border-radius: 12px; background: var(--papel); }
+.arte-previa { overflow: hidden; border: 1px solid var(--cor-borda); border-radius: 12px; background: var(--papel); }
 .arte-previa[hidden] { display: none; }
-.arte-previa img { display: block; width: 100%; max-height: 50vh; object-fit: contain; }
+.arte-previa img { display: block; width: 100%; height: auto; }
 
 /* ---------- Botão "Criar nova postagem" (no lugar de "Nenhuma postagem ainda") ---------- */
 .cartao-novo {
