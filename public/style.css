@@ -163,7 +163,7 @@ nav a {
    - Com JS: basta colocar a classe "ativo" no link do tópico visível. */
 nav a.ativo,
 nav a[aria-current="true"],
-body:not(.js):not(:has(.topico:target)) nav a[href="#mural"],
+body:not(.js):not(:has(.topico:target)) nav a[href="#noticias"],
 body:not(.js):has(#mural:target) nav a[href="#mural"],
 body:not(.js):has(#esportes:target) nav a[href="#esportes"],
 body:not(.js):has(#noticias:target) nav a[href="#noticias"],
