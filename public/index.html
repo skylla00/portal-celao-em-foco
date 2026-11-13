@@ -77,15 +77,14 @@
   <!-- ========== NAV (fica acima do header) ========== -->
   <nav aria-label="Tópicos do portal">
     <ul>
-      <li><a href="#mural">Mural de Avisos</a></li>
-      <li><a href="#esportes">Esportes</a></li>
       <li><a href="#noticias">Notícias</a></li>
+      <li><a href="#esportes">Esportes</a></li>
       <li><a href="#entrevistas">Entrevistas</a></li>
       <li><a href="#resenha-critica">Resenha Crítica</a></li>
       <li><a href="#opiniao">Opinião</a></li>
       <li><a href="#artes">Artes</a></li>
-      <!-- Item SECRETO: existe no código, mas fica escondido por CSS (.nav-secreto).
-           Só se chega aqui digitando o endereço do site com #login no final. -->
+      <li class="nav-secreto"><a href="#mural" tabindex="-1">Mural de Avisos</a></li>
+      <!-- Itens secretos: existem no código, mas ficam escondidos por CSS (.nav-secreto). -->
       <li class="nav-secreto"><a href="#login" tabindex="-1">Login</a></li>
     </ul>
   </nav>
@@ -109,23 +108,15 @@
        os cartões usando os <template> lá embaixo. -->
   <main id="painel-topicos">
 
-    <!-- Mural de Avisos (página inicial) -->
-    <section class="topico" id="mural" data-topico="mural">
-      <h2>Mural de Avisos</h2>
-      <!-- JS: inserir o aviso mais novo SEMPRE no começo (prepend) -->
-      <div class="lista" id="lista-mural"></div>
-      <p class="vazio">Nenhum aviso publicado ainda.</p>
+    <section class="topico" id="noticias" data-topico="noticias">
+      <h2>Notícias</h2>
+      <div class="lista" id="lista-noticias"></div>
+      <p class="vazio">Nenhuma postagem ainda.</p>
     </section>
 
     <section class="topico" id="esportes" data-topico="esportes">
       <h2>Esportes</h2>
       <div class="lista" id="lista-esportes"></div>
-      <p class="vazio">Nenhuma postagem ainda.</p>
-    </section>
-
-    <section class="topico" id="noticias" data-topico="noticias">
-      <h2>Notícias</h2>
-      <div class="lista" id="lista-noticias"></div>
       <p class="vazio">Nenhuma postagem ainda.</p>
     </section>
 
@@ -154,6 +145,14 @@
       <button type="button" id="btn-enviar-arte" class="btn-principal" hidden>Enviar arte</button>
       <div class="lista" id="lista-artes"></div>
       <p class="vazio">Nenhuma arte publicada ainda.</p>
+    </section>
+
+    <!-- Mural de Avisos: mantido para acesso direto da diretoria -->
+    <section class="topico" id="mural" data-topico="mural" hidden>
+      <h2>Mural de Avisos</h2>
+      <!-- JS: inserir o aviso mais novo SEMPRE no começo (prepend) -->
+      <div class="lista" id="lista-mural"></div>
+      <p class="vazio">Nenhum aviso publicado ainda.</p>
     </section>
 
     <!-- Leitura de uma postagem (aparece só quando o JS abrir uma matéria).

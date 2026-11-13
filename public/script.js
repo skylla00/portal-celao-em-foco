@@ -2,7 +2,7 @@
    Portal Celao em Foco — script.js
    - Lê as postagens da API e monta os cartões (usa os <template> do index.html).
    - Abre uma matéria na página de leitura.
-   - Rotas secretas por hash: #login, #jornalista, #editor.
+   - Rotas por hash: #login, #jornalista, #editor e #mural (diretoria).
    - Login pelo Clerk. A SEGURANÇA REAL fica na API (servidor): aqui o JS só
      decide o que mostrar. Não há senha nem usuário guardados neste arquivo.
    ========================================================== */
@@ -312,7 +312,7 @@
   }
 
   async function restaurarSessao() {
-    const rotaSecreta = /^#(login|jornalista|editor)/.test(location.hash);
+    const rotaSecreta = /^#(login|jornalista|editor|mural)/.test(location.hash);
     if (!temDica() && !rotaSecreta) return;
     try {
       const clerk = await carregarClerk();
@@ -322,6 +322,7 @@
       if (erro.status === 401 || erro.status === 403) lembrar(false);
     }
     renderizar();
+    if (ehDiretoria() && location.hash === '#mural') mostrarSite('mural');
   }
 
   /* ---------- Postagens públicas ---------- */
@@ -641,6 +642,7 @@
   }
 
   function renderizar() {
+    $('#mural').hidden = !ehDiretoria();
     renderizarAvisos();
     renderizarArtes();
     const modelo = $('#modelo-cartao-postagem');
@@ -748,7 +750,7 @@
         requestAnimationFrame(() => {
           esperando = false;
           if (!$('#leitura').hidden) return;
-          const lista = [...raiz.querySelectorAll('.topico:not(#leitura)')];
+          const lista = [...raiz.querySelectorAll('.topico:not(#leitura):not([hidden])')];
           const i = Math.round(raiz.scrollLeft / raiz.clientWidth);
           const topico = lista[Math.min(Math.max(i, 0), lista.length - 1)];
           if (topico) marcarAtivo(topico.id);
@@ -1010,8 +1012,8 @@
     }
     leitura.hidden = true;
     const alvo = hash ? document.getElementById(hash) : null;
-    const valido = alvo?.classList.contains('topico') && alvo.id !== 'leitura';
-    const topico = valido ? alvo : $('#mural');
+    const valido = alvo?.classList.contains('topico') && alvo.id !== 'leitura' && !alvo.hidden;
+    const topico = valido ? alvo : $('#noticias');
     irParaTopico(topico);
     marcarAtivo(topico.id);
     window.scrollTo({ top: 0, behavior: 'instant' }); // o link da aba pula a página: volta para o topo
@@ -1120,7 +1122,7 @@
     fecharMenuPerfil();
     atualizarBarra();
     renderizar();
-    location.hash = '#mural';
+    location.hash = '#noticias';
   }
 
   /* ---------- Editor de postagem ---------- */
@@ -1364,7 +1366,7 @@
     window.addEventListener('hashchange', rotear);
 
     observarTopicos();
-    marcarAtivo('mural');
+    marcarAtivo('noticias');
     estado.pronto = carregarPostagens();
     carregarAvisos();
     carregarArtes();
