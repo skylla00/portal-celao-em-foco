@@ -2,7 +2,7 @@
    Portal Celao em Foco — script.js
    - Lê as postagens da API e monta os cartões (usa os <template> do index.html).
    - Abre uma matéria na página de leitura.
-   - Rotas secretas por hash: #login, #jornalista, #editor.
+   - Rotas por hash: #login, #jornalista, #editor e #mural (diretoria).
    - Login pelo Clerk. A SEGURANÇA REAL fica na API (servidor): aqui o JS só
      decide o que mostrar. Não há senha nem usuário guardados neste arquivo.
    ========================================================== */
@@ -312,7 +312,7 @@
   }
 
   async function restaurarSessao() {
-    const rotaSecreta = /^#(login|jornalista|editor)/.test(location.hash);
+    const rotaSecreta = /^#(login|jornalista|editor|mural)/.test(location.hash);
     if (!temDica() && !rotaSecreta) return;
     try {
       const clerk = await carregarClerk();
@@ -322,6 +322,7 @@
       if (erro.status === 401 || erro.status === 403) lembrar(false);
     }
     renderizar();
+    if (ehDiretoria() && location.hash === '#mural') mostrarSite('mural');
   }
 
   /* ---------- Postagens públicas ---------- */
@@ -336,10 +337,31 @@
     renderizar();
   }
 
+  // Ordena: fixadas antes das demais; entre as fixadas, a mais recente primeiro.
+  // O sort é estável, então as não fixadas mantêm a ordem que a API já mandou (mais novas primeiro).
+  function porFixacao(a, b) {
+    if (Boolean(a.fixado) !== Boolean(b.fixado)) return a.fixado ? -1 : 1;
+    if (a.fixado) return new Date(b.fixadoEm) - new Date(a.fixadoEm);
+    return 0;
+  }
+
   function criarCartao(modelo, p) {
     const no = modelo.content.cloneNode(true);
     no.querySelector('article').dataset.id = p.id;
     $('.btn-excluir', no).hidden = !ehJornalista(); // lixeira: só para jornalista
+
+    // Fixar: jornalista vê sempre (e clica); os demais só veem quando a matéria está fixada (sem clicar)
+    const btnFixar = $('.btn-fixar', no);
+    const fixado = Boolean(p.fixado);
+    const podeFixar = ehJornalista();
+    const rotuloFixar = fixado ? (podeFixar ? 'Desafixar matéria' : 'Matéria fixada') : 'Fixar matéria';
+    btnFixar.hidden = !(podeFixar || fixado);
+    btnFixar.disabled = !podeFixar;
+    btnFixar.classList.toggle('fixado', fixado);
+    btnFixar.setAttribute('aria-pressed', String(fixado));
+    btnFixar.setAttribute('aria-label', rotuloFixar);
+    btnFixar.title = rotuloFixar;
+
     campo(no, 'link').href = `#post-${p.id}`;
     definirImagem(campo(no, 'banner'), p.imagem, `Banner da matéria: ${p.titulo}`);
     campo(no, 'titulo').textContent = p.titulo;
@@ -641,6 +663,7 @@
   }
 
   function renderizar() {
+    $('#mural').hidden = !ehDiretoria();
     renderizarAvisos();
     renderizarArtes();
     const modelo = $('#modelo-cartao-postagem');
@@ -655,7 +678,9 @@
         campo(botao, 'novo').dataset.categoria = slug;
         lista.append(botao);
       }
-      for (const p of estado.postagens.filter((x) => x.categoria === slug)) {
+      // Fixadas no topo da aba (a fixada mais recentemente primeiro); o resto segue por data
+      const daAba = estado.postagens.filter((x) => x.categoria === slug).sort(porFixacao);
+      for (const p of daAba) {
         lista.append(criarCartao(modelo, p));
       }
 
@@ -748,7 +773,7 @@
         requestAnimationFrame(() => {
           esperando = false;
           if (!$('#leitura').hidden) return;
-          const lista = [...raiz.querySelectorAll('.topico:not(#leitura)')];
+          const lista = [...raiz.querySelectorAll('.topico:not(#leitura):not([hidden])')];
           const i = Math.round(raiz.scrollLeft / raiz.clientWidth);
           const topico = lista[Math.min(Math.max(i, 0), lista.length - 1)];
           if (topico) marcarAtivo(topico.id);
@@ -916,6 +941,41 @@
     });
   }
 
+  /* ---------- Fixar / desafixar matéria; a API confere no servidor que é jornalista ---------- */
+  const fixando = new Set(); // ids com pedido em andamento (evita clique duplo)
+
+  async function alternarFixacao(botao) {
+    if (!ehJornalista()) return;
+    const id = botao.closest('[data-id]')?.dataset.id;
+    const p = estado.postagens.find((x) => x.id === id);
+    if (!p || fixando.has(id)) return;
+
+    fixando.add(id);
+    botao.disabled = true;
+    try {
+      const dados = await api(
+        `/api/postagens?id=${encodeURIComponent(id)}`,
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fixado: !p.fixado }) },
+        true,
+      );
+      p.fixado = Boolean(dados.fixado);
+      p.fixadoEm = dados.fixadoEm || null;
+    } catch (e) {
+      if (e.status === 404) estado.postagens = estado.postagens.filter((x) => x.id !== id);
+      else window.alert(e.status === 401 ? 'Sua sessão expirou. Entre novamente.' : e.message || 'Não foi possível fixar agora.');
+    } finally {
+      fixando.delete(id);
+      renderizar(); // refaz os cartões: a matéria sobe para o topo da aba (ou volta para o lugar por data)
+    }
+  }
+
+  function iniciarFixacao() {
+    document.addEventListener('click', (evento) => {
+      const botao = evento.target.closest('.btn-fixar');
+      if (botao && !botao.disabled) alternarFixacao(botao);
+    });
+  }
+
   /* ---------- Excluir matéria, arte ou aviso; a API confere a permissão no servidor ---------- */
   async function excluirItem() {
     const alvo = estado.excluindo;
@@ -1010,8 +1070,8 @@
     }
     leitura.hidden = true;
     const alvo = hash ? document.getElementById(hash) : null;
-    const valido = alvo?.classList.contains('topico') && alvo.id !== 'leitura';
-    const topico = valido ? alvo : $('#mural');
+    const valido = alvo?.classList.contains('topico') && alvo.id !== 'leitura' && !alvo.hidden;
+    const topico = valido ? alvo : $('#noticias');
     irParaTopico(topico);
     marcarAtivo(topico.id);
     window.scrollTo({ top: 0, behavior: 'instant' }); // o link da aba pula a página: volta para o topo
@@ -1120,7 +1180,7 @@
     fecharMenuPerfil();
     atualizarBarra();
     renderizar();
-    location.hash = '#mural';
+    location.hash = '#noticias';
   }
 
   /* ---------- Editor de postagem ---------- */
@@ -1346,6 +1406,7 @@
     $('#btn-sair').addEventListener('click', sair);
     iniciarPerfil();
     iniciarExclusao();
+    iniciarFixacao();
     iniciarEnvioArte();
     $('#btn-visitante').addEventListener('click', () => {
       estado.visitante = !estado.visitante;
@@ -1364,7 +1425,7 @@
     window.addEventListener('hashchange', rotear);
 
     observarTopicos();
-    marcarAtivo('mural');
+    marcarAtivo('noticias');
     estado.pronto = carregarPostagens();
     carregarAvisos();
     carregarArtes();

@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS postagens (
 -- Imagem do FINAL da matéria (tamanho livre, diferente da capa)
 ALTER TABLE postagens ADD COLUMN IF NOT EXISTS imagem_final TEXT;
 
+-- Matéria fixada no topo da aba: guarda QUANDO foi fixada (NULL = não fixada).
+-- Só o jornalista fixa/desafixa; quando há várias fixadas, a fixada mais recentemente vem primeiro.
+ALTER TABLE postagens ADD COLUMN IF NOT EXISTS fixado_em TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS postagens_criado_em_idx ON postagens (criado_em DESC);
 CREATE INDEX IF NOT EXISTS postagens_autor_idx ON postagens (autor_id);
 
