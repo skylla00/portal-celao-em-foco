@@ -1065,8 +1065,45 @@ body.modo-tela-cheia > .barra-jornalista { display: none !important; }
   transition: background-color 0.2s, transform 0.2s;
 }
 .btn-excluir[hidden] { display: none; }
-/* a etiqueta da categoria sai do canto esquerdo para dar lugar à lixeira */
-.cartao-postagem:has(.btn-excluir:not([hidden])) .tag { left: auto; right: 0.75rem; }
+/* a etiqueta da categoria sai do canto esquerdo para dar lugar à lixeira (e não encosta no botão de fixar, à direita) */
+.cartao-postagem:has(.btn-excluir:not([hidden])) .tag {
+  left: 3.6rem;
+  max-width: calc(100% - 6.9rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Fixar matéria (canto superior direito do cartão) ---------- */
+/* Não fixada: claro (só o jornalista vê). Fixada: escuro e visível para todos. */
+.btn-fixar {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2240;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, transform 0.2s;
+}
+.btn-fixar[hidden] { display: none; }
+.btn-fixar.fixado {
+  background: #0b0e2a;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.btn-fixar.fixado svg { fill: currentColor; }
+/* quem não é jornalista só vê o selo: não é clicável */
+.btn-fixar:disabled { cursor: default; opacity: 1; }
+.btn-fixar:disabled:not(.fixado) { opacity: 0.6; cursor: progress; } /* aguardando o servidor */
 
 /* ---------- Janela de confirmação ---------- */
 .dialogo {
@@ -1192,6 +1229,8 @@ body.modo-tela-cheia > .barra-jornalista { display: none !important; }
   .btn-principal:hover:not(:disabled) { background: var(--azul-escuro, #1c3fa5); transform: translateY(-1px); }
   .cartao-novo:hover { background: color-mix(in srgb, var(--destaque) 14%, var(--superficie)); transform: translateY(-3px); }
   .btn-excluir:hover { background: #d92d20; transform: scale(1.08); }
+  .btn-fixar:not(:disabled):hover { transform: scale(1.08); }
+  .btn-fixar:not(.fixado):not(:disabled):hover { background: #ffffff; }
   .perfil-chip:hover { background: color-mix(in srgb, #1f2240 20%, transparent); }
 }
 @media (hover: none) { .avatar-trocar { opacity: 0.85; font-size: 0.72rem; } }
