@@ -32,6 +32,7 @@
     erroArtes: false,
     imagemArte: null,
     enviandoArte: false,
+    editandoArte: null,
     visitante: false, // jornalista olhando o site "como visitante"
     categoriaNova: 'noticias',
     leituraCategoria: 'noticias',
@@ -349,6 +350,7 @@
     const no = modelo.content.cloneNode(true);
     no.querySelector('article').dataset.id = p.id;
     $('.btn-excluir', no).hidden = !ehJornalista(); // lixeira: só para jornalista
+    $('.btn-editar', no).hidden = !ehJornalista();
 
     // Fixar: jornalista vê sempre (e clica); os demais só veem quando a matéria está fixada (sem clicar)
     const btnFixar = $('.btn-fixar', no);
@@ -402,6 +404,7 @@
     const artigo = no.querySelector('article');
     artigo.dataset.id = arte.id;
     $('.btn-excluir', no).hidden = !ehJornalista();
+    $('.btn-editar', no).hidden = !ehJornalista();
     const imagem = campo(no, 'imagem-arte');
     if (arte.imagemLargura && arte.imagemAltura) {
       imagem.width = arte.imagemLargura;
@@ -449,16 +452,37 @@
     };
     const limpar = () => {
       estado.imagemArte = null;
+      estado.editandoArte = null;
       form.reset();
       imgPrevia.removeAttribute('src');
       previa.hidden = true;
       avisar('');
+      $('#titulo-dialogo-arte').textContent = 'Enviar arte';
+      botaoPublicar.textContent = 'Publicar arte';
     };
 
     $('#btn-enviar-arte').addEventListener('click', () => {
       if (!ehJornalista()) return;
+      limpar();
       dialogo.showModal();
       form.imagem.focus();
+    });
+    document.addEventListener('click', (evento) => {
+      const botao = evento.target.closest('.cartao-arte .btn-editar');
+      if (!botao || !ehJornalista()) return;
+      const arte = estado.artes.find((x) => x.id === botao.closest('[data-id]')?.dataset.id);
+      if (!arte) return;
+      estado.editandoArte = arte;
+      estado.imagemArte = null;
+      form.reset();
+      form.legenda.value = arte.legenda;
+      imgPrevia.src = arte.imagem;
+      previa.hidden = false;
+      avisar('');
+      $('#titulo-dialogo-arte').textContent = 'Editar arte';
+      botaoPublicar.textContent = 'Editar arte';
+      dialogo.showModal();
+      form.legenda.focus();
     });
     botaoCancelar.addEventListener('click', () => dialogo.close());
     dialogo.addEventListener('close', limpar);
@@ -479,50 +503,61 @@
       } catch (erro) {
         estado.imagemArte = null;
         form.imagem.value = '';
-        imgPrevia.removeAttribute('src');
-        previa.hidden = true;
+        if (estado.editandoArte) {
+          imgPrevia.src = estado.editandoArte.imagem;
+          previa.hidden = false;
+        } else {
+          imgPrevia.removeAttribute('src');
+          previa.hidden = true;
+        }
         avisar(erro.message || 'Não foi possível usar esta imagem.');
       }
     });
 
     form.addEventListener('submit', async (evento) => {
       evento.preventDefault();
-      if (!estado.imagemArte) return avisar('Escolha a imagem da arte.');
+      const arteEditada = estado.editandoArte;
+      if (!arteEditada && !estado.imagemArte) return avisar('Escolha a imagem da arte.');
 
       estado.enviandoArte = true;
       botaoPublicar.disabled = true;
       botaoCancelar.disabled = true;
-      botaoPublicar.textContent = 'Publicando…';
+      botaoPublicar.textContent = arteEditada ? 'Salvando…' : 'Publicando…';
       avisar('');
       try {
         const dados = await api(
-          '/api/artes',
+          arteEditada ? `/api/artes?id=${encodeURIComponent(arteEditada.id)}` : '/api/artes',
           {
-            method: 'POST',
+            method: arteEditada ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               legenda: form.legenda.value.trim(),
-              imagem: estado.imagemArte.dados,
-              largura: estado.imagemArte.largura,
-              altura: estado.imagemArte.altura,
+              imagem: estado.imagemArte?.dados,
+              largura: estado.imagemArte?.largura,
+              altura: estado.imagemArte?.altura,
             }),
           },
           true,
         );
-        estado.artes.unshift(dados.arte);
+        if (arteEditada) {
+          const indice = estado.artes.findIndex((x) => x.id === arteEditada.id);
+          if (indice !== -1) estado.artes[indice] = dados.arte;
+        } else {
+          estado.artes.unshift(dados.arte);
+        }
         renderizar();
         dialogo.close();
       } catch (erro) {
         avisar(
           erro.status === 401
-            ? 'Sua sessão expirou. Entre novamente e tente publicar a arte.'
-            : erro.message || 'Não foi possível publicar a arte agora.',
+            ? 'Sua sessão expirou. Entre novamente.'
+            : erro.message || `Não foi possível ${arteEditada ? 'editar' : 'publicar'} a arte agora.`,
         );
       } finally {
         estado.enviandoArte = false;
         botaoPublicar.disabled = false;
         botaoCancelar.disabled = false;
-        botaoPublicar.textContent = 'Publicar arte';
+        botaoPublicar.textContent = arteEditada ? 'Editar arte' : 'Publicar arte';
       }
     });
   }
@@ -976,6 +1011,16 @@
     });
   }
 
+  function iniciarEdicaoPostagens() {
+    document.addEventListener('click', (evento) => {
+      const botao = evento.target.closest('.cartao-postagem .btn-editar');
+      if (!botao || !ehJornalista()) return;
+      const id = botao.closest('[data-id]')?.dataset.id;
+      if (!id || !estado.postagens.some((item) => item.id === id)) return;
+      location.hash = `#editor/${encodeURIComponent(id)}`;
+    });
+  }
+
   /* ---------- Excluir matéria, arte ou aviso; a API confere a permissão no servidor ---------- */
   async function excluirItem() {
     const alvo = estado.excluindo;
@@ -1090,11 +1135,11 @@
     location.replace(estado.jornalista ? rotaInicial() : '#login');
   }
 
-  async function mostrarEditor() {
+  async function mostrarEditor(id = null) {
     await estado.sessaoPronta;
     if (!estado.jornalista) return location.replace('#login');
     if (estado.jornalista.papel !== 'jornalista') return location.replace(rotaInicial()); // o editor de matérias é só do jornalista
-    abrirEditor();
+    abrirEditor(id);
   }
 
   async function rotear() {
@@ -1102,7 +1147,7 @@
     const rota = hash.split('/')[0];
     if (rota === 'login') return mostrarLogin();
     if (rota === 'jornalista') return entrarComoJornalista();
-    if (rota === 'editor') return mostrarEditor();
+    if (rota === 'editor') return mostrarEditor(hash.split('/')[1] || null);
     return mostrarSite(hash);
   }
 
@@ -1250,14 +1295,30 @@
   const prepararFoto = (arquivo) =>
     gerarJpeg(arquivo, { cobrir: true, largura: 256, altura: 256, limite: 550_000 });
 
-  function abrirEditor() {
+  function abrirEditor(id = null) {
+    const postagem = id ? estado.postagens.find((item) => item.id === id) : null;
+    if (id && (!ehJornalista() || !postagem)) {
+      location.replace('#noticias');
+      return;
+    }
     const tela = $('#tela-editor');
     tela.replaceChildren($('#modelo-editor').content.cloneNode(true));
     telaCheia('editor');
     const form = $('form', tela);
-    form.categoria.value = estado.categoriaNova in CATEGORIAS ? estado.categoriaNova : 'noticias';
+    const tituloEditor = $('h1', form);
+    tituloEditor.textContent = postagem ? 'Editar postagem' : 'Nova postagem';
+    const botaoPublicar = campo(form, 'publicar');
+    botaoPublicar.textContent = postagem ? 'Editar' : 'Publicar';
+    form.categoria.value = postagem?.categoria || (estado.categoriaNova in CATEGORIAS ? estado.categoriaNova : 'noticias');
+    if (postagem) {
+      form.titulo.value = postagem.titulo;
+      form.conteudo.value = postagem.conteudo;
+      estado.categoriaNova = postagem.categoria;
+    }
     estado.imagem = null;
     estado.imagemFinal = null;
+    let removerImagemExistente = false;
+    let removerImagemFinalExistente = false;
 
     const previa = campo(form, 'previa');
     const imgPrevia = $('img', previa);
@@ -1271,6 +1332,7 @@
     };
     const limparImagem = () => {
       estado.imagem = null;
+      removerImagemExistente = Boolean(postagem?.imagem);
       form.imagem.value = '';
       imgPrevia.hidden = true;
       imgPrevia.removeAttribute('src');
@@ -1285,6 +1347,7 @@
       aviso('');
       try {
         estado.imagem = await prepararImagem(arquivo);
+        removerImagemExistente = false;
         imgPrevia.src = estado.imagem;
         imgPrevia.hidden = false;
         textoPrevia.hidden = true;
@@ -1303,6 +1366,7 @@
     const removerFinal = $('[data-acao="remover-final"]', form);
     const limparFinal = () => {
       estado.imagemFinal = null;
+      removerImagemFinalExistente = Boolean(postagem?.imagemFinal);
       form.imagemFinal.value = '';
       imgFinal.hidden = true;
       imgFinal.removeAttribute('src');
@@ -1315,6 +1379,7 @@
       aviso('');
       try {
         estado.imagemFinal = await prepararImagemFinal(arquivo);
+        removerImagemFinalExistente = false;
         imgFinal.src = estado.imagemFinal;
         imgFinal.hidden = false;
         caixaFinal.hidden = false;
@@ -1325,6 +1390,20 @@
       }
     });
     removerFinal.addEventListener('click', limparFinal);
+
+    if (postagem?.imagem) {
+      imgPrevia.src = postagem.imagem;
+      imgPrevia.hidden = false;
+      textoPrevia.hidden = true;
+      previa.classList.add('tem-imagem');
+      remover.hidden = false;
+    }
+    if (postagem?.imagemFinal) {
+      imgFinal.src = postagem.imagemFinal;
+      imgFinal.hidden = false;
+      caixaFinal.hidden = false;
+      removerFinal.hidden = false;
+    }
 
     // "Anexar arquivo .md": o texto do arquivo entra no campo de conteúdo, exatamente como está.
     // Se o arquivo começar com "# Título" e o título ainda estiver vazio, essa linha vira o título.
@@ -1344,7 +1423,7 @@
         texto = texto.trim();
         if (texto.length > 60000) return aviso('O texto do arquivo passa de 60.000 caracteres.');
         form.conteudo.value = texto;
-        aviso(`Arquivo "${arquivo.name}" carregado. Revise o texto e clique em Publicar.`, 'ok');
+        aviso(`Arquivo "${arquivo.name}" carregado. Revise o texto e clique em ${postagem ? 'Editar' : 'Publicar'}.`, 'ok');
       } catch {
         aviso('Não foi possível ler este arquivo.');
       }
@@ -1363,15 +1442,14 @@
       if (!conteudo) return aviso('Escreva o conteúdo da reportagem.');
       if (!(categoria in CATEGORIAS)) return aviso('Escolha uma categoria.');
 
-      const botao = campo(form, 'publicar');
-      botao.disabled = true;
-      botao.textContent = 'Publicando…';
+      botaoPublicar.disabled = true;
+      botaoPublicar.textContent = postagem ? 'Salvando…' : 'Publicando…';
       aviso('');
       try {
         const dados = await api(
-          '/api/postagens',
+          postagem ? `/api/postagens?id=${encodeURIComponent(postagem.id)}` : '/api/postagens',
           {
-            method: 'POST',
+            method: postagem ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               titulo,
@@ -1379,21 +1457,28 @@
               categoria,
               imagem: estado.imagem || undefined,
               imagemFinal: estado.imagemFinal || undefined,
+              removerImagem: removerImagemExistente,
+              removerImagemFinal: removerImagemFinalExistente,
             }),
           },
           true,
         );
-        estado.postagens.unshift(dados.postagem);
+        if (postagem) {
+          const indice = estado.postagens.findIndex((x) => x.id === postagem.id);
+          if (indice !== -1) estado.postagens[indice] = dados.postagem;
+        } else {
+          estado.postagens.unshift(dados.postagem);
+        }
         renderizar();
         location.hash = `#${categoria}`;
       } catch (erro) {
         if (erro.status === 401) {
-          aviso('Sua sessão expirou. Entre de novo pelo endereço de login (em outra aba) e publique outra vez — o texto desta tela foi mantido.');
+          aviso(`Sua sessão expirou. Entre de novo pelo endereço de login (em outra aba) e ${postagem ? 'edite' : 'publique'} outra vez — o texto desta tela foi mantido.`);
         } else {
-          aviso(erro.message || 'Não foi possível publicar agora.');
+          aviso(erro.message || `Não foi possível ${postagem ? 'editar' : 'publicar'} agora.`);
         }
-        botao.disabled = false;
-        botao.textContent = 'Publicar';
+        botaoPublicar.disabled = false;
+        botaoPublicar.textContent = postagem ? 'Editar' : 'Publicar';
       }
     });
 
@@ -1407,6 +1492,7 @@
     iniciarPerfil();
     iniciarExclusao();
     iniciarFixacao();
+    iniciarEdicaoPostagens();
     iniciarEnvioArte();
     $('#btn-visitante').addEventListener('click', () => {
       estado.visitante = !estado.visitante;

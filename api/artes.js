@@ -23,8 +23,9 @@ function formatar(linha) {
 export default async function handler(req, res) {
   if (req.method === 'GET') return listar(res);
   if (req.method === 'POST') return criar(req, res);
+  if (req.method === 'PUT') return editar(req, res);
   if (req.method === 'DELETE') return excluir(req, res);
-  return metodoNaoPermitido(res, ['GET', 'POST', 'DELETE']);
+  return metodoNaoPermitido(res, ['GET', 'POST', 'PUT', 'DELETE']);
 }
 
 async function listar(res) {
@@ -81,6 +82,86 @@ async function criar(req, res) {
       }
     }
     return responder(res, 500, { erro: 'Não foi possível publicar a arte agora. Tente novamente.' });
+  }
+}
+
+async function editar(req, res) {
+  const auth = await exigirJornalista(req);
+  if (!auth.ok) return responder(res, auth.status, { erro: auth.erro });
+
+  const id = String(req.query?.id ?? '');
+  if (!/^\d{1,18}$/.test(id)) return responder(res, 400, { erro: 'Arte inválida.' });
+
+  const corpo = lerJson(req);
+  if (!corpo) return responder(res, 400, { erro: 'Envie os dados em JSON.' });
+  const { erro, dados } = validarArte(corpo, { imagemObrigatoria: false });
+  if (erro) return responder(res, 400, { erro });
+
+  let urlImagem = null;
+  try {
+    const sql = conectar();
+    const atuais = await sql`SELECT imagem FROM artes WHERE id = ${id}`;
+    if (!atuais.length) return responder(res, 404, { erro: 'Esta arte não existe mais.' });
+
+    if (dados.imagem) {
+      const blob = await put(`artes/img.${dados.imagem.extensao}`, dados.imagem.buffer, {
+        access: 'public',
+        addRandomSuffix: true,
+        contentType: dados.imagem.tipo,
+      });
+      urlImagem = blob.url;
+    }
+
+    const linhas = await sql`
+      WITH alterada AS (
+        UPDATE artes
+        SET legenda = ${dados.legenda},
+            imagem = COALESCE(${urlImagem}::text, imagem),
+            imagem_largura = CASE
+              WHEN ${urlImagem}::text IS NOT NULL THEN ${dados.largura}
+              ELSE imagem_largura
+            END,
+            imagem_altura = CASE
+              WHEN ${urlImagem}::text IS NOT NULL THEN ${dados.altura}
+              ELSE imagem_altura
+            END
+        WHERE id = ${id}
+        RETURNING *
+      )
+      SELECT a.id, a.legenda, a.imagem, a.imagem_largura, a.imagem_altura, a.criado_em,
+             COALESCE(f.nome_exibicao, a.autor) AS autor,
+             COALESCE(f.foto, a.autor_foto) AS autor_foto
+      FROM alterada a
+      LEFT JOIN perfis f ON f.autor_id = a.autor_id`;
+    if (!linhas.length) {
+      if (urlImagem) {
+        try {
+          await del(urlImagem);
+        } catch {
+          /* ignora */
+        }
+      }
+      return responder(res, 404, { erro: 'Esta arte não existe mais.' });
+    }
+
+    if (atuais[0].imagem !== linhas[0].imagem && ehBlob(atuais[0].imagem)) {
+      try {
+        await del(atuais[0].imagem);
+      } catch {
+        /* a arte já foi atualizada; uma imagem antiga órfã não impede a edição */
+      }
+    }
+    return responder(res, 200, { arte: formatar(linhas[0]) });
+  } catch (e) {
+    console.error('Falha ao editar arte:', e?.name || 'erro');
+    if (urlImagem) {
+      try {
+        await del(urlImagem);
+      } catch {
+        /* ignora */
+      }
+    }
+    return responder(res, 500, { erro: 'Não foi possível editar a arte agora. Tente novamente.' });
   }
 }
 

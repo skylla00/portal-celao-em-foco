@@ -1046,7 +1046,8 @@ body.modo-tela-cheia > .barra-jornalista { display: none !important; }
 
 /* ---------- Lixeira nos cartões (só jornalista) ---------- */
 .cartao-postagem { position: relative; }
-.btn-excluir {
+.btn-excluir,
+.btn-editar {
   position: absolute;
   top: 0.6rem;
   left: 0.6rem;
@@ -1064,7 +1065,13 @@ body.modo-tela-cheia > .barra-jornalista { display: none !important; }
   cursor: pointer;
   transition: background-color 0.2s, transform 0.2s;
 }
-.btn-excluir[hidden] { display: none; }
+.btn-excluir { background: rgba(21, 26, 70, 0.85); }
+.btn-editar {
+  top: 3.6rem;
+  background: rgba(11, 143, 179, 0.94);
+}
+.btn-excluir[hidden],
+.btn-editar[hidden] { display: none; }
 /* a etiqueta da categoria sai do canto esquerdo para dar lugar à lixeira (e não encosta no botão de fixar, à direita) */
 .cartao-postagem:has(.btn-excluir:not([hidden])) .tag {
   left: 3.6rem;

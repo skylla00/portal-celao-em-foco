@@ -9,8 +9,8 @@ Nada aqui foi configurado por mim: serviços externos, chaves e deploy ficam com
 public/            ← site público (a Vercel serve só esta pasta)
   index.html  style.css  script.js  logo.svg
 api/               ← rotas serverless da Vercel
-  postagens.js     GET (público), POST e DELETE (só jornalista)
-  artes.js         GET (público), POST e DELETE (só jornalista)
+  postagens.js     GET (público), POST, PUT e DELETE (só jornalista)
+  artes.js         GET (público), POST, PUT e DELETE (só jornalista)
   perfil.js        PUT: o jornalista edita o PRÓPRIO perfil (nome, bio, foto)
   sessao.js        GET: confirma no servidor se a sessão é de jornalista
   config.js        GET: entrega só a chave PÚBLICA do Clerk
@@ -105,6 +105,7 @@ O item "Login" existe no menu, mas fica escondido por CSS. A proteção de verda
 - **Anexar arquivo .md**: carrega o texto do arquivo no campo de conteúdo. Se o arquivo começar com `# Título` e o título estiver vazio, essa linha vira o título. Imagens no .md precisam ser links `https://...`.
 - **Markdown aceito**: `#`/`##` subtítulo, `###` subtítulo menor, `>` citação, listas (`-` e `1.`), `---`, `**negrito**`, `*itálico*`, `` `código` ``, `[texto](https://link)`, `![descrição](https://imagem)`. HTML escrito no texto aparece como texto (nunca é executado).
 - **Imagem do final**: opcional, sem formato fixo (o maior lado é limitado a 1600 px), aparece sempre depois do texto.
+- **Editar postagem**: o lápis abaixo da lixeira abre o editor preenchido. Salvar atualiza a matéria existente, sem alterar a data nem sua posição na lista, e sem exibir uma indicação de edição.
 - **Excluir**: lixeira no canto superior esquerdo de cada cartão (só para jornalista), com confirmação. Apaga a matéria e as imagens dela do Blob. Qualquer jornalista pode excluir qualquer matéria.
 - **Artes**: é uma galeria independente das categorias de matérias; veja a seção 12.
 
@@ -124,7 +125,7 @@ O item "Login" existe no menu, mas fica escondido por CSS. A proteção de verda
 
 ## 12. Galeria de Artes
 
-- **Quem publica e exclui**: jornalistas autenticados, com a mesma conta usada para publicar matérias.
-- **Como é**: botão "Enviar arte" abre uma janela própria com imagem obrigatória e legenda opcional. A imagem mantém sua proporção; o autor e a data aparecem na galeria.
+- **Quem publica, edita e exclui**: jornalistas autenticados, com a mesma conta usada para publicar matérias.
+- **Como é**: botão "Enviar arte" abre uma janela própria com imagem obrigatória e legenda opcional. O lápis abaixo da lixeira abre a mesma janela preenchida para editar a legenda ou substituir a imagem, sem alterar a data nem a posição na galeria. A imagem mantém sua proporção; o autor e a data aparecem na galeria.
 - **Banco e imagens**: rode o `schema.sql` atualizado no Neon antes de implantar o código. Ele cria a tabela `artes` e importa para ela, sem duplicar em execuções futuras, imagens de postagens antigas na categoria Artes. Novas artes ficam na tabela independente e no Blob.
 - Artes não são mais uma categoria no editor de matérias; as demais abas e o Mural mantêm seus fluxos atuais.

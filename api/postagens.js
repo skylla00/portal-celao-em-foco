@@ -28,9 +28,10 @@ function formatar(linha) {
 export default async function handler(req, res) {
   if (req.method === 'GET') return listar(res);
   if (req.method === 'POST') return criar(req, res);
+  if (req.method === 'PUT') return editar(req, res);
   if (req.method === 'PATCH') return fixar(req, res);
   if (req.method === 'DELETE') return excluir(req, res);
-  return metodoNaoPermitido(res, ['GET', 'POST', 'PATCH', 'DELETE']);
+  return metodoNaoPermitido(res, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 }
 
 // GET /api/postagens — público, sem login. Mais recentes primeiro.
@@ -137,6 +138,90 @@ async function criar(req, res) {
       }
     }
     return responder(res, 500, { erro: 'Não foi possível publicar agora. Tente novamente.' });
+  }
+}
+
+// PUT /api/postagens?id=123 — só jornalista autenticado. Mantém a data e a posição da matéria.
+async function editar(req, res) {
+  const auth = await exigirJornalista(req);
+  if (!auth.ok) return responder(res, auth.status, { erro: auth.erro });
+
+  const id = String(req.query?.id ?? '');
+  if (!/^\d{1,18}$/.test(id)) return responder(res, 400, { erro: 'Postagem inválida.' });
+
+  const corpo = lerJson(req);
+  if (!corpo) return responder(res, 400, { erro: 'Envie os dados em JSON.' });
+  const { erro, dados } = validarPostagem(corpo);
+  if (erro) return responder(res, 400, { erro });
+
+  const enviadas = [];
+  try {
+    const sql = conectar();
+    const atuais = await sql`SELECT imagem, imagem_final FROM postagens WHERE id = ${id}`;
+    if (!atuais.length) return responder(res, 404, { erro: 'Esta postagem não existe mais.' });
+
+    const urlImagem = await enviarImagem('postagens', dados.imagem);
+    if (urlImagem) enviadas.push(urlImagem);
+    const urlFinal = await enviarImagem('postagens', dados.imagemFinal);
+    if (urlFinal) enviadas.push(urlFinal);
+
+    const linhas = await sql`
+      WITH alterada AS (
+        UPDATE postagens
+        SET titulo = ${dados.titulo},
+            conteudo = ${dados.conteudo},
+            categoria = ${dados.categoria},
+            imagem = CASE
+              WHEN ${urlImagem}::text IS NOT NULL THEN ${urlImagem}
+              WHEN ${dados.removerImagem}::boolean THEN NULL
+              ELSE imagem
+            END,
+            imagem_final = CASE
+              WHEN ${urlFinal}::text IS NOT NULL THEN ${urlFinal}
+              WHEN ${dados.removerImagemFinal}::boolean THEN NULL
+              ELSE imagem_final
+            END
+        WHERE id = ${id}
+        RETURNING *
+      )
+      SELECT p.id, p.titulo, p.conteudo, p.categoria, p.imagem, p.imagem_final, p.criado_em, p.fixado_em,
+             COALESCE(f.nome_exibicao, p.autor) AS autor,
+             COALESCE(f.foto, p.autor_foto)     AS autor_foto,
+             f.bio                              AS autor_bio
+      FROM alterada p
+      LEFT JOIN perfis f ON f.autor_id = p.autor_id`;
+    if (!linhas.length) {
+      for (const url of enviadas) {
+        try {
+          await del(url);
+        } catch {
+          /* ignora */
+        }
+      }
+      return responder(res, 404, { erro: 'Esta postagem não existe mais.' });
+    }
+
+    for (const antiga of [atuais[0].imagem, atuais[0].imagem_final]) {
+      const foiSubstituida = antiga && (antiga !== linhas[0].imagem && antiga !== linhas[0].imagem_final);
+      if (!foiSubstituida || !ehBlob(antiga)) continue;
+      try {
+        await del(antiga);
+      } catch {
+        /* a matéria já foi atualizada; uma imagem antiga órfã não impede a edição */
+      }
+    }
+
+    return responder(res, 200, { postagem: formatar(linhas[0]) });
+  } catch (e) {
+    console.error('Falha ao editar postagem:', e?.name || 'erro');
+    for (const url of enviadas) {
+      try {
+        await del(url);
+      } catch {
+        /* ignora */
+      }
+    }
+    return responder(res, 500, { erro: 'Não foi possível editar agora. Tente novamente.' });
   }
 }
 
