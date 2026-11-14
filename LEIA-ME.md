@@ -108,6 +108,8 @@ O item "Login" existe no menu, mas fica escondido por CSS. A proteção de verda
 - **Excluir**: lixeira no canto superior esquerdo de cada cartão (só para jornalista), com confirmação. Apaga a matéria e as imagens dela do Blob. Qualquer jornalista pode excluir qualquer matéria.
 - **Artes**: é uma galeria independente das categorias de matérias; veja a seção 12.
 
+- **Fixar matéria**: botão de alfinete no canto superior direito de cada cartão (só o jornalista vê e clica). A matéria fixada sobe para o topo da aba em que está; havendo várias, a fixada por último vem primeiro. Fixada, o alfinete fica escuro e **todos** o veem (visitantes não conseguem clicar). Rode o `schema.sql` atualizado no Neon antes de enviar o código novo (cria a coluna `fixado_em`); a rota `PATCH /api/postagens?id=...` confere no servidor o papel `jornalista`.
+
 ## 11. Mural de Avisos (conta da diretoria)
 
 - **Quem publica**: só quem tem `{ "role": "diretoria" }` no *Public metadata* do usuário no Clerk. Jornalista não publica aviso e diretoria não publica matéria (o servidor confere o papel em cada rota). Os dois papéis podem editar o próprio perfil (nome e foto).

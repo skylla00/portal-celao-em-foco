@@ -20,14 +20,17 @@ function formatar(linha) {
     autorFoto: linha.autor_foto || null,
     autorBio: linha.autor_bio || '',
     criadoEm: new Date(linha.criado_em).toISOString(),
+    fixado: Boolean(linha.fixado_em),
+    fixadoEm: linha.fixado_em ? new Date(linha.fixado_em).toISOString() : null,
   };
 }
 
 export default async function handler(req, res) {
   if (req.method === 'GET') return listar(res);
   if (req.method === 'POST') return criar(req, res);
+  if (req.method === 'PATCH') return fixar(req, res);
   if (req.method === 'DELETE') return excluir(req, res);
-  return metodoNaoPermitido(res, ['GET', 'POST', 'DELETE']);
+  return metodoNaoPermitido(res, ['GET', 'POST', 'PATCH', 'DELETE']);
 }
 
 // GET /api/postagens — público, sem login. Mais recentes primeiro.
@@ -38,14 +41,16 @@ async function listar(res) {
     const sql = conectar();
     let linhas;
     try {
+      // Fixadas primeiro (a fixada mais recentemente vem antes); o resto, por data.
+      // Assim uma matéria antiga fixada não fica de fora do LIMIT.
       linhas = await sql`
-        SELECT p.id, p.titulo, p.conteudo, p.categoria, p.imagem, p.imagem_final, p.criado_em,
+        SELECT p.id, p.titulo, p.conteudo, p.categoria, p.imagem, p.imagem_final, p.criado_em, p.fixado_em,
                COALESCE(f.nome_exibicao, p.autor) AS autor,
                COALESCE(f.foto, p.autor_foto)     AS autor_foto,
                f.bio                              AS autor_bio
         FROM postagens p
         LEFT JOIN perfis f ON f.autor_id = p.autor_id
-        ORDER BY p.criado_em DESC, p.id DESC
+        ORDER BY (p.fixado_em IS NULL), p.fixado_em DESC, p.criado_em DESC, p.id DESC
         LIMIT 200`;
     } catch {
       // Reserva: se o SQL novo (schema.sql) ainda não foi rodado no Neon, o site
@@ -132,6 +137,39 @@ async function criar(req, res) {
       }
     }
     return responder(res, 500, { erro: 'Não foi possível publicar agora. Tente novamente.' });
+  }
+}
+
+// PATCH /api/postagens?id=123  corpo: { "fixado": true | false } — só jornalista autenticado.
+// Fixar guarda o momento (fixado_em); desafixar volta para NULL. Repetir a mesma ação não muda nada.
+async function fixar(req, res) {
+  const auth = await exigirJornalista(req);
+  if (!auth.ok) return responder(res, auth.status, { erro: auth.erro });
+
+  const id = String(req.query?.id ?? '');
+  if (!/^\d{1,18}$/.test(id)) return responder(res, 400, { erro: 'Postagem inválida.' });
+
+  const corpo = lerJson(req);
+  if (!corpo || typeof corpo.fixado !== 'boolean') {
+    return responder(res, 400, { erro: 'Informe se a matéria deve ficar fixada.' });
+  }
+
+  try {
+    const sql = conectar();
+    const linhas = await sql`
+      UPDATE postagens
+      SET fixado_em = CASE WHEN ${corpo.fixado}::boolean THEN COALESCE(fixado_em, NOW()) ELSE NULL END
+      WHERE id = ${id}
+      RETURNING fixado_em`;
+    if (!linhas.length) return responder(res, 404, { erro: 'Esta postagem não existe mais.' });
+
+    return responder(res, 200, {
+      fixado: Boolean(linhas[0].fixado_em),
+      fixadoEm: linhas[0].fixado_em ? new Date(linhas[0].fixado_em).toISOString() : null,
+    });
+  } catch (e) {
+    console.error('Falha ao fixar postagem:', e?.name || 'erro');
+    return responder(res, 500, { erro: 'Não foi possível fixar agora. Tente novamente.' });
   }
 }
 

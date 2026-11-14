@@ -337,10 +337,31 @@
     renderizar();
   }
 
+  // Ordena: fixadas antes das demais; entre as fixadas, a mais recente primeiro.
+  // O sort é estável, então as não fixadas mantêm a ordem que a API já mandou (mais novas primeiro).
+  function porFixacao(a, b) {
+    if (Boolean(a.fixado) !== Boolean(b.fixado)) return a.fixado ? -1 : 1;
+    if (a.fixado) return new Date(b.fixadoEm) - new Date(a.fixadoEm);
+    return 0;
+  }
+
   function criarCartao(modelo, p) {
     const no = modelo.content.cloneNode(true);
     no.querySelector('article').dataset.id = p.id;
     $('.btn-excluir', no).hidden = !ehJornalista(); // lixeira: só para jornalista
+
+    // Fixar: jornalista vê sempre (e clica); os demais só veem quando a matéria está fixada (sem clicar)
+    const btnFixar = $('.btn-fixar', no);
+    const fixado = Boolean(p.fixado);
+    const podeFixar = ehJornalista();
+    const rotuloFixar = fixado ? (podeFixar ? 'Desafixar matéria' : 'Matéria fixada') : 'Fixar matéria';
+    btnFixar.hidden = !(podeFixar || fixado);
+    btnFixar.disabled = !podeFixar;
+    btnFixar.classList.toggle('fixado', fixado);
+    btnFixar.setAttribute('aria-pressed', String(fixado));
+    btnFixar.setAttribute('aria-label', rotuloFixar);
+    btnFixar.title = rotuloFixar;
+
     campo(no, 'link').href = `#post-${p.id}`;
     definirImagem(campo(no, 'banner'), p.imagem, `Banner da matéria: ${p.titulo}`);
     campo(no, 'titulo').textContent = p.titulo;
@@ -657,7 +678,9 @@
         campo(botao, 'novo').dataset.categoria = slug;
         lista.append(botao);
       }
-      for (const p of estado.postagens.filter((x) => x.categoria === slug)) {
+      // Fixadas no topo da aba (a fixada mais recentemente primeiro); o resto segue por data
+      const daAba = estado.postagens.filter((x) => x.categoria === slug).sort(porFixacao);
+      for (const p of daAba) {
         lista.append(criarCartao(modelo, p));
       }
 
@@ -915,6 +938,41 @@
     });
     document.addEventListener('keydown', (evento) => {
       if (evento.key === 'Escape') fecharMenuPerfil(true);
+    });
+  }
+
+  /* ---------- Fixar / desafixar matéria; a API confere no servidor que é jornalista ---------- */
+  const fixando = new Set(); // ids com pedido em andamento (evita clique duplo)
+
+  async function alternarFixacao(botao) {
+    if (!ehJornalista()) return;
+    const id = botao.closest('[data-id]')?.dataset.id;
+    const p = estado.postagens.find((x) => x.id === id);
+    if (!p || fixando.has(id)) return;
+
+    fixando.add(id);
+    botao.disabled = true;
+    try {
+      const dados = await api(
+        `/api/postagens?id=${encodeURIComponent(id)}`,
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fixado: !p.fixado }) },
+        true,
+      );
+      p.fixado = Boolean(dados.fixado);
+      p.fixadoEm = dados.fixadoEm || null;
+    } catch (e) {
+      if (e.status === 404) estado.postagens = estado.postagens.filter((x) => x.id !== id);
+      else window.alert(e.status === 401 ? 'Sua sessão expirou. Entre novamente.' : e.message || 'Não foi possível fixar agora.');
+    } finally {
+      fixando.delete(id);
+      renderizar(); // refaz os cartões: a matéria sobe para o topo da aba (ou volta para o lugar por data)
+    }
+  }
+
+  function iniciarFixacao() {
+    document.addEventListener('click', (evento) => {
+      const botao = evento.target.closest('.btn-fixar');
+      if (botao && !botao.disabled) alternarFixacao(botao);
     });
   }
 
@@ -1348,6 +1406,7 @@
     $('#btn-sair').addEventListener('click', sair);
     iniciarPerfil();
     iniciarExclusao();
+    iniciarFixacao();
     iniciarEnvioArte();
     $('#btn-visitante').addEventListener('click', () => {
       estado.visitante = !estado.visitante;
