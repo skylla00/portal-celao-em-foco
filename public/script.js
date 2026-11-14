@@ -23,6 +23,7 @@
   const estado = {
     postagens: [],
     erroLista: false,
+    carregandoPostagens: true,
     jornalista: null, // { papel, nome, bio, foto } da equipe logada — preenchido só depois que o SERVIDOR confirma o papel
     avisos: [], // avisos do Mural
     erroAvisos: false,
@@ -335,6 +336,8 @@
       estado.erroLista = false;
     } catch {
       estado.erroLista = true;
+    } finally {
+      estado.carregandoPostagens = false;
     }
     renderizar();
   }
@@ -722,10 +725,16 @@
 
       const vazio = lista.nextElementSibling;
       if (vazio?.classList.contains('vazio')) {
-        vazio.dataset.padrao ??= vazio.textContent;
-        vazio.textContent = estado.erroLista
-          ? 'Não foi possível carregar as postagens agora. Tente novamente mais tarde.'
-          : vazio.dataset.padrao;
+        const mensagem = $('[data-mensagem-vazia]', vazio);
+        if (mensagem) {
+          vazio.classList.toggle('carregando-postagens', estado.carregandoPostagens);
+          vazio.setAttribute('aria-busy', String(estado.carregandoPostagens));
+          mensagem.textContent = estado.carregandoPostagens
+            ? 'Carregando postagens'
+            : estado.erroLista
+              ? 'Não foi possível carregar as postagens agora. Tente novamente mais tarde.'
+              : mensagem.dataset.padrao;
+        }
       }
     }
   }

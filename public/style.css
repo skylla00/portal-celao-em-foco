@@ -681,6 +681,39 @@ header h1 span { color: var(--ouro); }
   text-align: center;
   color: var(--suave);
 }
+.vazio.carregando-postagens {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  border-style: solid;
+}
+.vazio.carregando-postagens::before { display: none; }
+.bolas-carregamento {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 1.5rem;
+}
+.bolinha-carregamento {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--azul);
+  animation: pular-bolinha 0.9s ease-in-out infinite;
+}
+.bolinha-carregamento:nth-child(2) {
+  background: var(--verde);
+  animation-delay: 0.15s;
+}
+.bolinha-carregamento:nth-child(3) {
+  background: var(--coral);
+  animation-delay: 0.3s;
+}
+@keyframes pular-bolinha {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-0.65rem); }
+}
 .vazio::before {
   content: "\201C";
   display: block;
@@ -795,6 +828,7 @@ footer { margin-top: auto; } /* em páginas curtas, o rodapé fica no fim da tel
 @media (prefers-reduced-motion: reduce) {
   #painel-topicos { scroll-behavior: auto; }
   .lista > .cartao, .lista > .aviso { animation: none; }
+  .bolinha-carregamento { animation: none; }
   .cartao-postagem, .banner-caixa .banner, .logo, #btn-voltar { transition: none; }
   .cartao-postagem:hover, .cartao-postagem:hover .banner { transform: none; }
 }
