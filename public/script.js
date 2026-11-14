@@ -36,6 +36,7 @@
     visitante: false, // jornalista olhando o site "como visitante"
     categoriaNova: 'noticias',
     leituraCategoria: 'noticias',
+    leituraPostagemId: null,
     imagem: null, // data URI da imagem de resumo já ajustada (16:9)
     imagemFinal: null, // data URI da imagem do final da matéria (proporção original)
     fotoNova: null, // foto de perfil escolhida e ainda não salva (data URI)
@@ -756,6 +757,7 @@
     definirImagem(campo(leitura, 'imagem-final'), p.imagemFinal, `Imagem do final da matéria: ${p.titulo}`);
 
     estado.leituraCategoria = p.categoria;
+    estado.leituraPostagemId = p.id;
     leitura.setAttribute('aria-label', p.titulo);
     leitura.hidden = false;
     irParaTopico(leitura);
@@ -1501,6 +1503,23 @@
     });
     $('#btn-voltar').addEventListener('click', () => {
       location.hash = `#${estado.leituraCategoria}`;
+    });
+    const btnCopiarLink = $('#btn-copiar-link');
+    const textoCopiarLink = $('[data-campo="texto-copiar-link"]', btnCopiarLink);
+    let temporizadorCopiaLink;
+    btnCopiarLink.addEventListener('click', async () => {
+      try {
+        const link = new URL(`/p/${encodeURIComponent(estado.leituraPostagemId)}`, location.origin).href;
+        await navigator.clipboard.writeText(link);
+        textoCopiarLink.textContent = 'Link copiado!';
+      } catch (erro) {
+        console.error('Falha ao copiar link de compartilhamento:', erro?.name || 'erro');
+        textoCopiarLink.textContent = 'Falha ao copiar';
+      }
+      clearTimeout(temporizadorCopiaLink);
+      temporizadorCopiaLink = setTimeout(() => {
+        textoCopiarLink.textContent = 'Copiar link';
+      }, 2500);
     });
     document.addEventListener('click', (evento) => {
       const botao = evento.target.closest('.cartao-novo');

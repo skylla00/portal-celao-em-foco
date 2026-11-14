@@ -479,12 +479,21 @@ header h1 span { color: var(--ouro); }
 
 /* ---------- 9. LEITURA DE UMA MATÉRIA ---------- */
 #leitura > * { max-width: 760px; margin-left: auto; margin-right: auto; }
-#leitura > #btn-voltar { margin-left: max(0px, calc((100% - 760px) / 2)); margin-right: 0; }
-
-#btn-voltar {
-  display: block;
-  min-height: 44px;
+#leitura > .leitura-acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 1rem;
+}
+
+#btn-voltar,
+#btn-copiar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
   padding: 0.55rem 1.1rem;
   border: 0;
   border-radius: 999px;
@@ -496,6 +505,8 @@ header h1 span { color: var(--ouro); }
   cursor: pointer;
   transition: background-color 0.2s, transform 0.2s;
 }
+
+#btn-copiar-link { white-space: nowrap; }
 
 #leitura .cartao {
   padding: 1.25rem;
@@ -777,6 +788,7 @@ footer { margin-top: auto; } /* em páginas curtas, o rodapé fica no fim da tel
     text-underline-offset: 4px;
   }
   #btn-voltar:hover { background: var(--azul); transform: translateX(-3px); }
+  #btn-copiar-link:hover { background: var(--azul); }
 }
 
 /* Respeita quem prefere menos movimento */
