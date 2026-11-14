@@ -330,15 +330,21 @@
 
   /* ---------- Postagens públicas ---------- */
   async function carregarPostagens() {
+    const tempoMinimoVisivel = new Promise((resolver) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setTimeout(resolver, 500));
+      });
+    });
+
     try {
       const dados = await api('/api/postagens');
       estado.postagens = Array.isArray(dados.postagens) ? dados.postagens : [];
       estado.erroLista = false;
     } catch {
       estado.erroLista = true;
-    } finally {
-      estado.carregandoPostagens = false;
     }
+    await tempoMinimoVisivel;
+    estado.carregandoPostagens = false;
     renderizar();
   }
 
