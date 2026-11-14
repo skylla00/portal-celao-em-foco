@@ -108,6 +108,10 @@ O item "Login" existe no menu, mas fica escondido por CSS. A proteção de verda
 - **Excluir**: lixeira no canto superior esquerdo de cada cartão (só para jornalista), com confirmação. Apaga a matéria e as imagens dela do Blob. Qualquer jornalista pode excluir qualquer matéria.
 - **Artes**: é uma galeria independente das categorias de matérias; veja a seção 12.
 
+- **Fixar matéria**: botão de alfinete no canto superior direito de cada cartão (só o jornalista vê e clica). A matéria fixada sobe para o topo da aba em que está; havendo várias, a fixada por último vem primeiro. Fixada, o alfinete fica escuro e **todos** o veem (visitantes não conseguem clicar). Rode o `schema.sql` atualizado no Neon antes de enviar o código novo (cria a coluna `fixado_em`); a rota `PATCH /api/postagens?id=...` confere no servidor o papel `jornalista`.
+
+- **Prévia nas redes sociais (Open Graph)**: cada matéria tem um endereço próprio, `https://SEU-PROJETO.vercel.app/p/NÚMERO`, em que o servidor (`api/compartilhar.js`) monta o título, a descrição (começo do texto) e a imagem de capa a partir do banco. Funciona para matérias antigas e novas, sem mudar o banco. Quem abre esse link é levada direto para a matéria no site (`/#post-NÚMERO`). O número aparece no endereço quando você abre uma matéria (`#post-NÚMERO`). Links antigos com `#` continuam abrindo, mas sem prévia própria. Sem capa, a prévia usa o banner do portal. As redes guardam a prévia em cache: para atualizar uma já compartilhada, use o depurador de links do Facebook (developers.facebook.com/tools/debug).
+
 ## 11. Mural de Avisos (conta da diretoria)
 
 - **Quem publica**: só quem tem `{ "role": "diretoria" }` no *Public metadata* do usuário no Clerk. Jornalista não publica aviso e diretoria não publica matéria (o servidor confere o papel em cada rota). Os dois papéis podem editar o próprio perfil (nome e foto).

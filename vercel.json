@@ -1,6 +1,9 @@
 {
   "framework": null,
   "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/p/:id", "destination": "/api/compartilhar?id=:id" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
