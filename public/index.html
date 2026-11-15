@@ -78,10 +78,10 @@
   <nav aria-label="Tópicos do portal">
     <ul>
       <li><a href="#noticias">Notícias</a></li>
-      <li><a href="#esportes">Esportes</a></li>
+      <li><a href="#opiniao">Opinião</a></li>
       <li><a href="#entrevistas">Entrevistas</a></li>
       <li><a href="#resenha-critica">Resenha Crítica</a></li>
-      <li><a href="#opiniao">Opinião</a></li>
+      <li><a href="#esportes">Esportes</a></li>
       <li><a href="#artes">Artes</a></li>
       <li class="nav-secreto"><a href="#mural" tabindex="-1">Mural de Avisos</a></li>
       <!-- Itens secretos: existem no código, mas ficam escondidos por CSS (.nav-secreto). -->
@@ -121,17 +121,11 @@
       </p>
     </section>
 
-    <section class="topico" id="esportes" data-topico="esportes">
-      <h2>Esportes</h2>
-      <div class="lista" id="lista-esportes"></div>
-      <p class="vazio carregando-postagens" role="status" aria-live="polite" aria-busy="true">
-        <span class="bolas-carregamento" aria-hidden="true">
-          <span class="bolinha-carregamento"></span>
-          <span class="bolinha-carregamento"></span>
-          <span class="bolinha-carregamento"></span>
-        </span>
-        <span data-mensagem-vazia data-padrao="Nenhuma postagem ainda.">Carregando postagens</span>
-      </p>
+    <!-- Opinião: textos de opinião dos artistas e da comunidade escolar -->
+    <section class="topico" id="opiniao" data-topico="opiniao">
+      <h2>Opinião</h2>
+      <div class="lista" id="lista-opiniao"></div>
+      <p class="vazio">Nenhuma opinião publicada ainda.</p>
     </section>
 
     <section class="topico" id="entrevistas" data-topico="entrevistas">
@@ -153,11 +147,17 @@
       <p class="vazio">Nenhuma postagem ainda.</p>
     </section>
 
-    <!-- Opinião: textos de opinião dos artistas e da comunidade escolar -->
-    <section class="topico" id="opiniao" data-topico="opiniao">
-      <h2>Opinião</h2>
-      <div class="lista" id="lista-opiniao"></div>
-      <p class="vazio">Nenhuma opinião publicada ainda.</p>
+    <section class="topico" id="esportes" data-topico="esportes">
+      <h2>Esportes</h2>
+      <div class="lista" id="lista-esportes"></div>
+      <p class="vazio carregando-postagens" role="status" aria-live="polite" aria-busy="true">
+        <span class="bolas-carregamento" aria-hidden="true">
+          <span class="bolinha-carregamento"></span>
+          <span class="bolinha-carregamento"></span>
+          <span class="bolinha-carregamento"></span>
+        </span>
+        <span data-mensagem-vazia data-padrao="Nenhuma postagem ainda.">Carregando postagens</span>
+      </p>
     </section>
 
     <!-- Artes: galeria com as artes da escola -->
