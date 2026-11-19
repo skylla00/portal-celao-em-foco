@@ -775,6 +775,7 @@
     estado.leituraPostagemId = p.id;
     leitura.setAttribute('aria-label', p.titulo);
     leitura.hidden = false;
+    painelTopicos().classList.add('leitura-aberta');
     irParaTopico(leitura);
     marcarAtivo(p.categoria);
     // a leitura começa no topo da matéria (cabeçalho e menu ficam para cima, é só rolar de volta)
@@ -1131,6 +1132,7 @@
       return;
     }
     leitura.hidden = true;
+    painelTopicos().classList.remove('leitura-aberta');
     const alvo = hash ? document.getElementById(hash) : null;
     const valido = alvo?.classList.contains('topico') && alvo.id !== 'leitura' && !alvo.hidden;
     const topico = valido ? alvo : $('#noticias');
@@ -1519,6 +1521,18 @@
     $('#btn-voltar').addEventListener('click', () => {
       location.hash = `#${estado.leituraCategoria}`;
     });
+    document.addEventListener(
+      'keydown',
+      (evento) => {
+        if (
+          !$('#leitura').hidden &&
+          (evento.key === 'ArrowLeft' || evento.key === 'ArrowRight')
+        ) {
+          evento.preventDefault();
+        }
+      },
+      true,
+    );
     const btnCopiarLink = $('#btn-copiar-link');
     const textoCopiarLink = $('[data-campo="texto-copiar-link"]', btnCopiarLink);
     let temporizadorCopiaLink;

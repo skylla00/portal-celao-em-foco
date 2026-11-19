@@ -267,6 +267,11 @@ header h1 span { color: var(--ouro); }
   scroll-behavior: smooth;
   scrollbar-width: none;
 }
+#painel-topicos.leitura-aberta {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
 #painel-topicos::-webkit-scrollbar { display: none; }
 
 .topico {
